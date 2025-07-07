@@ -1,12 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import SupabaseConnectivityTest from './SupabaseConnectivityTest'
-// MUDANÇA: Reativada a importação do useRouter para navegação
 import { useRouter } from 'next/navigation' 
 import { ArrowRight } from 'lucide-react'
 
-// Mensagens e imagens focadas no Huambo
+// MUDANÇA: Adicionadas mais imagens e mensagens
 const slides = [
   {
     image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=2670&auto=format&fit=crop',
@@ -24,11 +22,18 @@ const slides = [
     image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=2671&auto=format&fit=crop',
     message: 'A sua pesquisa no Huambo, simples e segura.',
   },
+  {
+    image: 'https://images.unsplash.com/photo-1598228723793-52759bba239c?q=80&w=2574&auto=format&fit=crop',
+    message: 'Conectando pessoas a propriedades de sonho.',
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1558036117-15d82a90b9b1?q=80&w=2670&auto=format&fit=crop',
+    message: 'O seu futuro começa com uma nova porta.',
+  },
 ]
 
 export default function WelcomeScreen() {
   const [currentSlide, setCurrentSlide] = useState(0)
-  // MUDANÇA: Reativado o hook para navegação
   const router = useRouter() 
 
   useEffect(() => {
@@ -40,19 +45,13 @@ export default function WelcomeScreen() {
   }, [currentSlide])
 
   const handleContinue = () => {
-    // Agora leva para a tela de escolha de perfil
-    router.push('/escolher-perfil')
+    // De acordo com o plano, esta tela leva para a escolha de perfil
+    router.push('/escolher-perfil') 
   }
 
   return (
     <main className="bg-white w-full h-screen">
-      {/* Teste de conectividade Supabase (remova depois de testar) */}
-      <div className="absolute top-2 left-2 z-50">
-        <SupabaseConnectivityTest />
-      </div>
-      {/* Container que cria as margens responsivas */}
       <div className="relative w-full h-full p-4 md:p-6 lg:p-8">
-        {/* Container do slideshow com cantos arredondados */}
         <div className="relative w-full h-full overflow-hidden rounded-2xl">
           <style>{`
             @keyframes pulse-light {
@@ -64,7 +63,7 @@ export default function WelcomeScreen() {
               }
             }
           `}</style>
-          {/* Container para as imagens do slideshow */}
+          
           {slides.map((slide, index) => (
             <div
               key={index}
@@ -72,9 +71,9 @@ export default function WelcomeScreen() {
               style={{ backgroundImage: `url(${slide.image})` }}
             />
           ))}
-          {/* Overlay escuro sobre as imagens */}
+          
           <div className="absolute inset-0 bg-black opacity-40"></div>
-          {/* Container das mensagens centralizado */}
+
           <div className="absolute inset-0 z-10 flex items-center justify-center text-center">
             <div className="w-full h-16">
                 {slides.map((slide, index) => (
@@ -87,7 +86,7 @@ export default function WelcomeScreen() {
                 ))}
             </div>
           </div>
-          {/* Container do botão na parte inferior */}
+
           <div className="absolute bottom-12 left-0 right-0 z-10 flex justify-center">
             <button 
               onClick={handleContinue}
@@ -95,6 +94,7 @@ export default function WelcomeScreen() {
             >
               <span className="mr-2">Continuar</span>
               <ArrowRight size={22} />
+              
               <span className="absolute top-0 left-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[pulse-light_2s_ease-in-out_infinite]"></span>
             </button>
           </div>

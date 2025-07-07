@@ -1,171 +1,135 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Search, MapPin, BedDouble, Bath, Heart, ChevronDown, Building, Home, ArrowLeft, UserCircle, DollarSign, LoaderCircle, SearchX, Send } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, MapPin, BedDouble, Bath, Heart, ChevronDown, Building, Home, ArrowLeft, UserCircle, DollarSign, LoaderCircle, SearchX, SlidersHorizontal, X, LogOut, User as UserIcon } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
-const allPropertiesMock = [
-    {
-    id: 1,
-    title: 'Vivenda T3 Espaçosa no Bairro Académico',
-    location: 'Académico, Huambo',
-    price: 150000,
-    beds: 3,
-    baths: 2,
-    type: 'Vivenda',
-    image: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?q=80&w=2670&auto=format&fit=crop',
-    favorited: false,
-    description: 'Uma vivenda deslumbrante com acabamentos de alta qualidade, localizada numa zona calma e segura. Ideal para famílias que procuram conforto e espaço. Possui um quintal espaçoso e garagem para dois carros.',
-    amenities: ['Garagem', 'Quintal', 'Cozinha Equipada', 'Ar Condicionado'],
-  },
-  {
-    id: 2,
-    title: 'Apartamento Moderno no Centro da Cidade',
-    location: 'Centro, Huambo',
-    price: 120000,
-    beds: 2,
-    baths: 1,
-    type: 'Apartamento',
-    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2670&auto=format&fit=crop',
-    favorited: true,
-    description: 'Apartamento totalmente remodelado com um design moderno e minimalista. Perfeito para jovens profissionais ou casais. Perto de todos os serviços essenciais, como lojas, restaurantes e transportes públicos.',
-    amenities: ['Elevador', 'Varanda', 'Segurança 24h'],
-  },
-  {
-    id: 3,
-    title: 'Moradia com Quintal na Zona do Sassonde',
-    location: 'Sassonde, Huambo',
-    price: 180000,
-    beds: 4,
-    baths: 3,
-    type: 'Moradia',
-    image: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=2574&auto=format&fit=crop',
-    favorited: false,
-    description: 'Excelente moradia para quem gosta de natureza e tranquilidade. Com um vasto quintal com árvores de fruto e espaço para lazer. A casa é ampla e arejada, com uma suíte principal e três quartos adicionais.',
-    amenities: ['Quintal Amplo', 'Lareira', 'Área de Churrasco'],
-  },
-  {
-    id: 4,
-    title: 'Apartamento T2 Remodelado',
-    location: 'São João, Huambo',
-    price: 95000,
-    beds: 2,
-    baths: 2,
-    type: 'Apartamento',
-    image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2670&auto=format&fit=crop',
-    favorited: false,
-    description: 'Apartamento acolhedor e funcional, recentemente remodelado. Cozinha equipada e quartos com roupeiros embutidos. Ótima oportunidade de investimento ou para habitação própria.',
-    amenities: ['Cozinha Equipada', 'Varanda'],
-  },
-    {
-    id: 5,
-    title: 'Vivenda de Luxo com Piscina',
-    location: 'Aviação, Huambo',
-    price: 350000,
-    beds: 5,
-    baths: 4,
-    type: 'Vivenda',
-    image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=2653&auto=format&fit=crop',
-    favorited: false,
-    description: 'Uma propriedade exclusiva que oferece o máximo em luxo e conforto. Com uma piscina privativa, jardim bem cuidado e interiores espaçosos e elegantes. A escolha perfeita para quem procura um estilo de vida sofisticado.',
-    amenities: ['Piscina', 'Jardim', 'Garagem', 'Segurança 24h'],
-  },
-  {
-    id: 6,
-    title: 'Apartamento Aconchegante perto do Mercado',
-    location: 'Centro, Huambo',
-    price: 80000,
-    beds: 1,
-    baths: 1,
-    type: 'Apartamento',
-    image: 'https://images.unsplash.com/photo-1494203484021-3c454daf695d?q=80&w=2670&auto=format&fit=crop',
-    favorited: true,
-    description: 'Ideal para estudantes ou para quem procura uma solução prática e económica. Localizado numa zona central, com fácil acesso a comércio e transportes. Totalmente mobilado e pronto a habitar.',
-    amenities: ['Mobilado', 'Localização Central'],
-  },
-];
+// --- COMPONENTES DE UI ---
 
-// --- COMPONENTES ---
+const Header = () => {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const router = useRouter();
+    const supabase = createClient();
+    const menuRef = useRef(null);
 
-const Header = () => (
-  <header className="bg-white shadow-sm sticky top-0 z-30">
-    <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-      <div className="flex items-center space-x-2">
-        <Building className="text-purple-600" size={28} />
-        <span className="text-xl font-bold text-gray-800">ImóveisHuambo</span>
-      </div>
-      <div className="flex items-center">
-        <button className="p-2 rounded-full hover:bg-gray-100">
-            <UserCircle size={28} className="text-gray-600"/>
-        </button>
-      </div>
-    </div>
-  </header>
-);
-
-const SearchAndFilterBar = ({ filters, setFilters }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const barRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (barRef.current && !barRef.current.contains(event.target)) {
-        setIsExpanded(false);
-      }
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push('/login');
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
-  return (
-    <div className="container mx-auto px-4 py-6 relative z-20" ref={barRef}>
-        <button
-          onClick={() => setIsExpanded(true)}
-          className={`w-full max-w-lg mx-auto bg-white rounded-full shadow-lg p-3 flex items-center justify-between cursor-pointer hover:shadow-xl transition-all text-left ${isExpanded ? 'ring-2 ring-purple-500' : ''}`}
-        >
-          <div className="flex items-center space-x-3 flex-1">
-            <Search size={20} className="text-purple-600 ml-2" />
-            <input
-                type="text"
-                readOnly={!isExpanded}
-                placeholder="Comece a sua pesquisa..."
-                value={filters.searchQuery}
-                onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                className="w-full bg-transparent outline-none text-sm text-gray-800 placeholder-gray-500"
-            />
+    return (
+      <header className="bg-white shadow-sm sticky top-0 z-30">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Building className="text-purple-600" size={28} />
+            <span className="text-xl font-bold text-gray-800">ImóveisHuambo</span>
           </div>
-          {isExpanded && (
-            <button onClick={(e) => {e.stopPropagation(); setIsExpanded(false);}}>
-                <ChevronDown size={20} className="text-gray-500 hover:text-gray-700" />
+          <div className="relative" ref={menuRef}>
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-full hover:bg-gray-100">
+                <UserCircle size={28} className="text-gray-600"/>
             </button>
-          )}
-        </button>
-    </div>
-  );
+            {isMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-40 animate-fade-in-down">
+                    <button 
+                        onClick={() => router.push('/profile')}
+                        className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                        <UserIcon size={16} className="mr-2"/>
+                        Ver Perfil
+                    </button>
+                    <button 
+                        onClick={handleLogout}
+                        className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                        <LogOut size={16} className="mr-2"/>
+                        Sair
+                    </button>
+                </div>
+            )}
+          </div>
+        </div>
+      </header>
+    );
 };
+
+const FilterModal = ({ filters, setFilters, isOpen, onClose }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start pt-20 z-40" onClick={onClose}>
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg animate-fade-in-down" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center border-b pb-3 mb-4">
+                    <h3 className="text-xl font-semibold">Filtros Avançados</h3>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200"><X size={20}/></button>
+                </div>
+                <div className="space-y-6">
+                    <div>
+                        <label className="text-sm font-medium text-gray-700">Tipo de Anúncio</label>
+                        <div className="flex mt-2 rounded-lg bg-gray-100 p-1">
+                            <button onClick={() => setFilters(prev => ({...prev, adType: 'arrendar'}))} className={`w-1/2 py-2 rounded-md text-sm font-semibold transition-colors ${filters.adType === 'arrendar' ? 'bg-purple-600 text-white' : 'text-gray-600'}`}>Arrendar</button>
+                            <button onClick={() => setFilters(prev => ({...prev, adType: 'vender'}))} className={`w-1/2 py-2 rounded-md text-sm font-semibold transition-colors ${filters.adType === 'vender' ? 'bg-purple-600 text-white' : 'text-gray-600'}`}>Comprar</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label htmlFor="location" className="text-sm font-medium text-gray-700">Localização</label>
+                        <input id="location" type="text" placeholder="Ex: Centro da Cidade, Académico" value={filters.location} onChange={(e) => setFilters(prev => ({...prev, location: e.target.value}))} className="w-full mt-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"/>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700">Tipo de Imóvel</label>
+                        <div className="grid grid-cols-3 gap-2 mt-2">
+                            {['Qualquer', 'Apartamento', 'Vivenda', 'Moradia'].map(type => (
+                                <button key={type} onClick={() => setFilters(prev => ({...prev, propertyType: type}))} className={`px-3 py-2 border rounded-lg text-sm transition-colors ${filters.propertyType === type ? 'bg-purple-600 text-white border-purple-600' : 'bg-white hover:border-purple-400'}`}>{type}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700">Faixa de Preço (AOA)</label>
+                        <div className="flex items-center space-x-2 mt-1">
+                            <input type="number" placeholder="Mínimo" value={filters.priceRange.min} onChange={(e) => setFilters(prev => ({...prev, priceRange: {...prev.priceRange, min: e.target.value}}))} className="w-1/2 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"/>
+                            <input type="number" placeholder="Máximo" value={filters.priceRange.max} onChange={(e) => setFilters(prev => ({...prev, priceRange: {...prev.priceRange, max: e.target.value}}))} className="w-1/2 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const PropertyCard = ({ property, onClick, onToggleFavorite }) => (
   <div
     onClick={onClick}
-    className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl cursor-pointer transition"
+    className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl cursor-pointer transition-all duration-300 group"
   >
-    <div className="relative">
-      <img src={property.image} alt={property.title} className="w-full h-56 object-cover" />
+    <div className="relative overflow-hidden">
+      <img src={property.image_urls?.[0] || 'https://placehold.co/600x400/EEE/31343C?text=Sem+Imagem'} alt={property.title} className="w-full h-56 object-cover transform group-hover:scale-110 group-hover:rotate-1 transition-transform duration-500 ease-in-out" />
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onToggleFavorite(property.id);
+          onToggleFavorite(property.id, property.favorited);
         }}
-        className="absolute top-4 right-4 p-2 bg-white/80 rounded-full"
+        className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full"
       >
-        <Heart size={20} className={property.favorited ? 'fill-red-500 text-red-500' : 'text-gray-500'} />
+        <Heart size={20} className={`transition-colors ${property.favorited ? 'text-red-500 fill-red-500' : 'text-gray-600 hover:text-red-500'}`} />
       </button>
     </div>
     <div className="p-4">
-      <h3 className="font-semibold text-lg">{property.title}</h3>
+      <h3 className="font-semibold text-lg text-gray-800 truncate">{property.title}</h3>
       <p className="text-sm text-gray-500 flex items-center mt-1">
         <MapPin size={14} className="mr-1" /> {property.location}
       </p>
-      <div className="mt-2 flex justify-between items-center">
+      <div className="mt-4 flex justify-between items-center">
         <p className="text-purple-600 font-bold text-lg">
           {new Intl.NumberFormat().format(property.price)} AOA
         </p>
@@ -178,6 +142,24 @@ const PropertyCard = ({ property, onClick, onToggleFavorite }) => (
   </div>
 );
 
+const PropertyCardSkeleton = () => (
+    <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="relative w-full h-56 bg-gray-200 overflow-hidden"><div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/50 to-transparent"></div></div>
+        <div className="p-4 space-y-3">
+            <div className="relative h-4 bg-gray-200 rounded w-3/4 overflow-hidden"><div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/50 to-transparent"></div></div>
+            <div className="relative h-3 bg-gray-200 rounded w-1/2 overflow-hidden"><div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/50 to-transparent"></div></div>
+            <div className="flex justify-between items-center pt-2">
+                <div className="relative h-6 bg-gray-200 rounded w-1/3 overflow-hidden"><div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/50 to-transparent"></div></div>
+                <div className="flex space-x-2">
+                    <div className="relative h-5 w-8 bg-gray-200 rounded overflow-hidden"><div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/50 to-transparent"></div></div>
+                    <div className="relative h-5 w-8 bg-gray-200 rounded overflow-hidden"><div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/50 to-transparent"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
+
 const PropertyDetail = ({ property, onGoBack, onToggleFavorite, onContact }) => (
   <div className="container mx-auto p-4 md:p-8">
     <button onClick={onGoBack} className="flex items-center text-purple-600 font-semibold mb-6">
@@ -185,244 +167,134 @@ const PropertyDetail = ({ property, onGoBack, onToggleFavorite, onContact }) => 
     </button>
     <div className="bg-white rounded-xl shadow-lg overflow-hidden grid md:grid-cols-5">
       <div className="md:col-span-3">
-        <img src={property.image} alt={property.title} className="w-full h-full max-h-[500px] object-cover" />
+        <img src={property.image_urls?.[0] || 'https://placehold.co/600x400/EEE/31343C?text=Sem+Imagem'} alt={property.title} className="w-full h-full max-h-[500px] object-cover" />
       </div>
       <div className="md:col-span-2 p-6 flex flex-col">
         <div className="flex justify-between items-start">
           <h1 className="text-2xl font-bold">{property.title}</h1>
-          <button onClick={() => onToggleFavorite(property.id)}>
+          <button onClick={() => onToggleFavorite(property.id, property.favorited)}>
             <Heart size={24} className={property.favorited ? 'fill-red-500 text-red-500' : 'text-gray-500'} />
           </button>
         </div>
-        <p className="flex items-center text-sm text-gray-500 mt-2">
-          <MapPin size={14} className="mr-2" /> {property.location}
-        </p>
-        <p className="text-2xl font-bold text-purple-600 my-4">
-          {new Intl.NumberFormat().format(property.price)} AOA
-        </p>
+        <p className="flex items-center text-sm text-gray-500 mt-2"><MapPin size={14} className="mr-2" /> {property.location}</p>
+        <p className="text-2xl font-bold text-purple-600 my-4">{new Intl.NumberFormat().format(property.price)} AOA</p>
         <div className="flex space-x-4 border-y py-3 text-gray-700">
           <span className="flex items-center"><BedDouble size={20} className="mr-2" /> {property.beds} Quartos</span>
           <span className="flex items-center"><Bath size={20} className="mr-2" /> {property.baths} WC</span>
         </div>
-        <div className="mt-4">
-          <h4 className="font-semibold mb-2">Descrição</h4>
-          <p className="text-gray-600">{property.description}</p>
-        </div>
-        <div className="mt-4">
-          <h4 className="font-semibold mb-2">Comodidades</h4>
-          <div className="flex flex-wrap gap-2">
-            {property.amenities.map(item => (
-              <span key={item} className="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full">{item}</span>
-            ))}
-          </div>
-        </div>
-        <button onClick={onContact} className="mt-auto bg-purple-600 text-white w-full py-3 rounded-lg mt-6 hover:bg-purple-700">
-          Contactar Proprietário
-        </button>
+        <div className="mt-4"><h4 className="font-semibold mb-2">Descrição</h4><p className="text-gray-600">{property.description}</p></div>
+        <div className="mt-4"><h4 className="font-semibold mb-2">Comodidades</h4><div className="flex flex-wrap gap-2">{property.amenities.map(item => (<span key={item} className="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full">{item}</span>))}</div></div>
+        <button onClick={onContact} className="mt-auto bg-purple-600 text-white w-full py-3 rounded-lg mt-6 hover:bg-purple-700">Contactar Proprietário</button>
       </div>
     </div>
   </div>
 );
 
-// NOVO: Componente para a vista de contacto com ícones e dados do vendedor
-import { Mail, Phone, MessageCircle } from 'lucide-react';
-
-export const ContactView = ({ property, onGoBack }) => {
-    // Mock de contato do vendedor (em produção, viria do backend ou do próprio imóvel)
-    const seller = property.seller || {
-        name: 'João Proprietário',
-        email: 'joao@email.com',
-        phone: '+244912345678',
-        whatsapp: '+244912345678',
-    };
-
-    return (
-        <div className="container mx-auto p-4 md:p-8 animate-fade-in">
-            <button onClick={onGoBack} className="flex items-center text-purple-600 font-semibold mb-6 hover:underline">
-                <ArrowLeft size={20} className="mr-2"/>
-                Voltar para os detalhes
-            </button>
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden p-8 max-w-2xl mx-auto">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Contactar Proprietário</h2>
-                <p className="text-gray-600 mb-4">Entre em contacto diretamente com o proprietário do imóvel: <span className="font-semibold">{property.title}</span></p>
-
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg border flex flex-col gap-2">
-                    <span className="font-semibold text-gray-700 flex items-center gap-2"><UserCircle size={20} /> {seller.name}</span>
-                    <div className="flex gap-4 mt-2">
-                        <a href={`mailto:${seller.email}`} className="flex flex-col items-center text-purple-700 hover:text-purple-900" title="E-mail">
-                            <Mail size={28} />
-                            <span className="text-xs mt-1">E-mail</span>
-                        </a>
-                        <a href={`tel:${seller.phone}`} className="flex flex-col items-center text-purple-700 hover:text-purple-900" title="Telefone">
-                            <Phone size={28} />
-                            <span className="text-xs mt-1">Telefone</span>
-                        </a>
-                        <a href={`sms:${seller.phone}`} className="flex flex-col items-center text-purple-700 hover:text-purple-900" title="SMS">
-                            <MessageCircle size={28} />
-                            <span className="text-xs mt-1">SMS</span>
-                        </a>
-                        <a href={`https://wa.me/${seller.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center text-green-600 hover:text-green-800" title="WhatsApp">
-                            <MessageCircle size={28} />
-                            <span className="text-xs mt-1">WhatsApp</span>
-                        </a>
-                    </div>
-                    <div className="mt-2 text-sm text-gray-600">
-                        <span className="block"><b>E-mail:</b> {seller.email}</span>
-                        <span className="block"><b>Telefone:</b> {seller.phone}</span>
-                        <span className="block"><b>WhatsApp:</b> {seller.whatsapp}</span>
-                    </div>
-                </div>
-
-                <form className="mt-6 space-y-4">
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">O seu Nome</label>
-                        <input type="text" id="name" required className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"/>
-                    </div>
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">O seu E-mail</label>
-                        <input type="email" id="email" required className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"/>
-                    </div>
-                    <div>
-                        <label htmlFor="message" className="block text-sm font-medium text-gray-700">Mensagem</label>
-                        <textarea id="message" rows="4" required className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"></textarea>
-                    </div>
-                    <button type="submit" className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                        <Send size={18} className="mr-2"/>
-                        Enviar Mensagem
-                    </button>
-                </form>
-            </div>
-        </div>
-    );
-};
-
-
 const NoResultsFound = ({ onClearFilters }) => (
     <div className="text-center py-16">
         <SearchX size={48} className="mx-auto text-gray-400" />
         <h3 className="mt-4 text-xl font-semibold text-gray-800">Nenhum imóvel encontrado</h3>
-        <p className="mt-2 text-gray-500">Tente ajustar os seus filtros ou procure por um termo diferente.</p>
-        <button 
-            onClick={onClearFilters}
-            className="mt-6 px-5 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors"
-        >
-            Limpar Filtros
-        </button>
+        <p className="mt-2 text-gray-500">Tente ajustar a sua pesquisa.</p>
+        <button onClick={onClearFilters} className="mt-6 px-5 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors">Limpar Filtros</button>
     </div>
 );
 
 export default function HomeScreen() {
+  const [allProperties, setAllProperties] = useState([]);
   const [propertyList, setPropertyList] = useState([]);
-  // MUDANÇA: Estado de vista agora controla o que é mostrado
-  const [view, setView] = useState({ name: 'list', data: null });
+  const [selectedProperty, setSelectedProperty] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // MUDANÇA: Adicionado estado para controlar a visibilidade do modal de filtros
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({
+    searchQuery: '',
     location: '',
     propertyType: 'Qualquer',
     priceRange: { min: '', max: '' },
-    searchQuery: '',
+    adType: 'arrendar',
   });
 
+  const supabase = createClient();
+
   useEffect(() => {
-    setIsLoading(true);
-    // Lê imóveis do localStorage e mescla com os mockados
-    let userProperties = [];
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('userProperties');
-      if (stored) {
-        userProperties = JSON.parse(stored);
-      }
-    }
-    const allProperties = [...userProperties, ...allPropertiesMock];
-    const { location, propertyType, priceRange, searchQuery } = filters;
+    const fetchProperties = async () => {
+        const { data, error } = await supabase.from('properties').select('*').eq('status', 'Ativo'); 
+        if (error) { console.error("Erro ao buscar imóveis:", error); } 
+        else { setAllProperties(data || []); }
+        setIsLoading(false);
+    };
+    fetchProperties();
+  }, []);
+
+  useEffect(() => {
     const filtered = allProperties.filter((prop) => {
+      const { searchQuery, location, propertyType, priceRange } = filters;
+      const matchSearch = searchQuery ? [prop.title, prop.description, prop.location].some(field => field && field.toLowerCase().includes(searchQuery.toLowerCase())) : true;
       const matchLocation = location ? prop.location.toLowerCase().includes(location.toLowerCase()) : true;
       const matchType = propertyType !== 'Qualquer' ? prop.type === propertyType : true;
-      const matchPrice = 
-        (priceRange.min ? prop.price >= Number(priceRange.min) : true) &&
-        (priceRange.max ? prop.price <= Number(priceRange.max) : true);
-      const matchSearch = searchQuery
-        ? [prop.title, prop.description, prop.location]
-            .some(field => field.toLowerCase().includes(searchQuery.toLowerCase()))
-        : true;
-      return matchLocation && matchType && matchPrice && matchSearch;
+      const matchPrice = (priceRange.min ? prop.price >= Number(priceRange.min) : true) && (priceRange.max ? prop.price <= Number(priceRange.max) : true);
+      return matchSearch && matchLocation && matchType && matchPrice;
     });
-    const timer = setTimeout(() => {
-      setPropertyList(filtered);
-      setIsLoading(false);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [filters]);
+    setPropertyList(filtered);
+  }, [filters, allProperties]);
 
-  const toggleFavorite = (id) => {
-    const updatedList = propertyList.map(p =>
-      p.id === id ? { ...p, favorited: !p.favorited } : p
-    );
-    setPropertyList(updatedList);
-    if (view.name === 'detail' && view.data.id === id) {
-      setView(prev => ({ ...prev, data: { ...prev.data, favorited: !prev.data.favorited }}));
-    }
-  };
-  
-  const handleClearFilters = () => {
-    setFilters({
-        location: '',
-        propertyType: 'Qualquer',
-        priceRange: { min: '', max: '' },
-        searchQuery: '',
-    });
-  };
-
-  const renderContent = () => {
-    switch(view.name) {
-        case 'detail':
-            return <PropertyDetail 
-                        property={view.data} 
-                        onGoBack={() => setView({ name: 'list', data: null })}
-                        onToggleFavorite={toggleFavorite}
-                        onContact={() => setView({ name: 'contact', data: view.data })}
-                    />
-        case 'contact':
-            return <ContactView 
-                        property={view.data}
-                        onGoBack={() => setView({ name: 'detail', data: view.data })}
-                    />
-        default: // 'list'
-            return (
-                <>
-                    <SearchAndFilterBar filters={filters} setFilters={setFilters} />
-                    <main className="container mx-auto px-4 pb-12">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-6">Imóveis Disponíveis</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {isLoading
-                            ? Array(6).fill(0).map((_, i) => (
-                                <div key={i} className="h-80 bg-white rounded-xl shadow animate-pulse"></div>
-                            ))
-                            : propertyList.length > 0
-                            ? propertyList.map((property) => (
-                                <PropertyCard
-                                    key={property.id}
-                                    property={property}
-                                    onToggleFavorite={toggleFavorite}
-                                    onClick={() => {
-                                        setView({ name: 'detail', data: property });
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }}
-                                />
-                            ))
-                            : <div className="col-span-full"><NoResultsFound onClearFilters={handleClearFilters} /></div>
-                        }
-                        </div>
-                    </main>
-                </>
-            )
-    }
-  }
+  const toggleFavorite = (id) => { console.log("Favoritar/desfavoritar imóvel:", id); };
+  const handleClearFilters = () => { setFilters({ searchQuery: '', location: '', propertyType: 'Qualquer', priceRange: { min: '', max: '' }, adType: 'arrendar' }); };
 
   return (
     <div className="bg-gray-50 min-h-screen">
+      <style>{`@keyframes shimmer { 100% { transform: translateX(100%); } }`}</style>
       <Header />
-      {renderContent()}
+      
+      {!selectedProperty ? (
+        <>
+          <section className="relative bg-gray-800 h-80 flex items-center justify-center">
+              <img src="https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=2670&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Fundo de casas"/>
+              <div className="relative z-10 text-center text-white p-4">
+                  <h1 className="text-4xl md:text-5xl font-bold">Encontre o seu Próximo Lar</h1>
+                  <p className="mt-4 text-lg text-white/90">A maior seleção de imóveis no coração de Angola.</p>
+                  <div className="mt-8 w-full max-w-2xl mx-auto">
+                    <div className="flex items-center bg-white rounded-full shadow-lg p-2">
+                        <input type="text" placeholder="Pesquise por título ou características..." value={filters.searchQuery} onChange={(e) => setFilters(prev => ({...prev, searchQuery: e.target.value}))} className="flex-1 bg-transparent px-4 py-2 outline-none text-gray-800 placeholder-gray-500"/>
+                        <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center px-4 py-2 bg-gray-100 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-200">
+                            <SlidersHorizontal size={16} className="mr-2"/> Filtros
+                        </button>
+                        <button className="p-3 bg-purple-600 text-white rounded-full hover:bg-purple-700 ml-2"><Search size={20}/></button>
+                    </div>
+                  </div>
+              </div>
+          </section>
+
+          <FilterModal filters={filters} setFilters={setFilters} isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} />
+
+          <main className="container mx-auto px-4 pb-12 mt-8 relative z-10">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Imóveis Disponíveis</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {isLoading
+                ? Array(6).fill(0).map((_, i) => <PropertyCardSkeleton key={i} />)
+                : propertyList.length > 0
+                ? propertyList.map((property, index) => (
+                    <div key={property.id} style={{animationDelay: `${index * 100}ms`}} className="animate-fade-in-up">
+                      <PropertyCard
+                        property={property}
+                        onToggleFavorite={toggleFavorite}
+                        onClick={() => { setSelectedProperty(property); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      />
+                    </div>
+                  ))
+                : <div className="col-span-full"><NoResultsFound onClearFilters={handleClearFilters} /></div>
+              }
+            </div>
+          </main>
+        </>
+      ) : (
+        <PropertyDetail 
+            property={selectedProperty} 
+            onGoBack={() => setSelectedProperty(null)}
+            onToggleFavorite={toggleFavorite}
+            onContact={() => alert('Navegar para a tela de contacto')}
+        />
+      )}
     </div>
   );
 }
