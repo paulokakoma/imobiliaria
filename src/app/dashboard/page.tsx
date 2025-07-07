@@ -1,82 +1,66 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, Building, ArrowLeft, MapPin, BedDouble, Bath, Search, MessageSquare, Briefcase } from 'lucide-react'
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-
-// --- Adiciona mocks ao banco se não houver dados ---
-const initialUserProperties = [
-  {
-    id: 1,
-    title: 'Vivenda T3 Espaçosa no Bairro Académico',
-    image: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?q=80&w=2670&auto=format&fit=crop',
-    status: 'Ativo',
-    price: 150000,
-    views: 1245,
-    location: 'Académico, Huambo',
-    beds: 3,
-    baths: 2,
-    description: 'Uma vivenda deslumbrante com acabamentos de alta qualidade, localizada numa zona calma e segura. Ideal para famílias que procuram conforto e espaço.',
-    amenities: ['Garagem', 'Quintal', 'Cozinha Equipada', 'Ar Condicionado'],
-    owner: 'proprietario1@email.com',
-  },
-  {
-    id: 2,
-    title: 'Apartamento Moderno no Centro da Cidade',
-    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2670&auto=format&fit=crop',
-    status: 'Pendente',
-    price: 120000,
-    views: 832,
-    location: 'Centro, Huambo',
-    beds: 2,
-    baths: 1,
-    description: 'Apartamento totalmente remodelado com um design moderno e minimalista. Perfeito para jovens profissionais ou casais.',
-    amenities: ['Elevador', 'Varanda', 'Segurança 24h'],
-    owner: 'proprietario2@email.com',
-  },
-  {
-    id: 3,
-    title: 'Moradia com Quintal na Zona do Sassonde',
-    image: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=2574&auto=format&fit=crop',
-    status: 'Arrendado',
-    price: 180000,
-    views: 2350,
-    location: 'Sassonde, Huambo',
-    beds: 4,
-    baths: 3,
-    description: 'Excelente moradia para quem gosta de natureza e tranquilidade. Com um vasto quintal com árvores de fruto e espaço para lazer.',
-    amenities: ['Quintal Amplo', 'Lareira', 'Área de Churrasco'],
-    owner: 'proprietario3@email.com',
-  },
-];
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Plus, Edit, Trash2, Eye, Building, ArrowLeft, MapPin, BedDouble, Bath, Search, MessageSquare, Briefcase, UserCircle, LogOut, User as UserIcon, LoaderCircle } from 'lucide-react'
 
 // --- COMPONENTES ---
 
 const Header = () => {
-  const router = useRouter();
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('user');
-    }
-    router.push('/login');
-  };
-  return (
-    <header className="bg-white shadow-sm sticky top-0 z-30">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Building className="text-purple-600" size={28} />
-          <span className="text-xl font-bold text-gray-800">ImóveisHuambo</span>
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const router = useRouter();
+    const supabase = createClient();
+    const menuRef = useRef(null);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push('/login');
+    };
+    
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+      <header className="bg-white shadow-sm sticky top-0 z-30">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Building className="text-purple-600" size={28} />
+            <span className="text-xl font-bold text-gray-800">ImóveisHuambo</span>
+          </div>
+          <div className="relative" ref={menuRef}>
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-full hover:bg-gray-100">
+                <UserCircle size={28} className="text-gray-600"/>
+            </button>
+            {isMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-40 animate-fade-in-down">
+                    <button 
+                        onClick={() => router.push('/profile')}
+                        className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                        <UserIcon size={16} className="mr-2"/>
+                        Ver Perfil
+                    </button>
+                    <button 
+                        onClick={handleLogout}
+                        className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                        <LogOut size={16} className="mr-2"/>
+                        Sair
+                    </button>
+                </div>
+            )}
+          </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium border border-gray-200 shadow-sm"
-        >
-          Sair
-        </button>
-      </div>
-    </header>
-  );
+      </header>
+    );
 };
 
 const DeleteConfirmationModal = ({ propertyTitle, onConfirm, onCancel }) => (
@@ -113,7 +97,7 @@ const PropertyDetailView = ({ property, onGoBack, showEditButton = false }) => (
             )}
         </div>
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <img src={property.image} alt={property.title} className="w-full h-64 object-cover"/>
+            <img src={property.image_urls?.[0] || 'https://placehold.co/600x400/EEE/31343C?text=Sem+Imagem'} alt={property.title} className="w-full h-64 object-cover"/>
             <div className="p-6">
                 <h2 className="text-2xl font-bold text-gray-800">{property.title}</h2>
                 <div className="flex items-center text-gray-500 mt-2"><MapPin size={16} className="mr-2" /><p>{property.location}</p></div>
@@ -128,7 +112,7 @@ const PropertyDetailView = ({ property, onGoBack, showEditButton = false }) => (
                     </div>
                     <div className="bg-gray-100 p-4 rounded-lg">
                         <p className="text-sm text-gray-500">Visualizações</p>
-                        <p className="text-lg font-bold text-gray-800">{property.views}</p>
+                        <p className="text-lg font-bold text-gray-800">{property.views || 0}</p>
                     </div>
                     <div className="bg-gray-100 p-4 rounded-lg">
                         <p className="text-sm text-gray-500">Contactos</p>
@@ -167,50 +151,59 @@ export default function SellerDashboardPage() {
     const [properties, setProperties] = useState([]);
     const [propertyToDelete, setPropertyToDelete] = useState(null);
     const [selectedProperty, setSelectedProperty] = useState(null); 
+    const [loading, setLoading] = useState(true);
+    
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('Todos');
-    const router = useRouter();
 
-    // Busca usuário logado (mock de sessão)
+    const router = useRouter();
+    const supabase = createClient();
+
     useEffect(() => {
-        async function seedAndFetchProperties() {
-            let user = null;
-            if (typeof window !== 'undefined') {
-                const stored = localStorage.getItem('user');
-                if (stored) user = JSON.parse(stored);
+        const fetchUserProperties = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                router.push('/login');
+                return;
             }
-            if (!user) return;
-            const supabase = createClient();
-            // Verifica se já existem propriedades no banco para este usuário
-            const { data: existing, error } = await supabase.from('properties').select('*').eq('owner', user.email);
-            if (!existing || existing.length === 0) {
-                // Adiciona mocks do usuário logado
-                const userMocks = initialUserProperties.filter(p => p.owner === user.email);
-                if (userMocks.length > 0) {
-                    await supabase.from('properties').insert(userMocks.map(({id, ...rest}) => rest));
-                }
+
+            const { data, error } = await supabase
+                .from('properties')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error("Erro ao buscar imóveis:", error);
+            } else {
+                setProperties(data || []);
             }
-            // Busca atualizada
-            const { data } = await supabase.from('properties').select('*').eq('owner', user.email);
-            setProperties(data || []);
-        }
-        seedAndFetchProperties();
-    }, []);
+            setLoading(false);
+        };
+
+        fetchUserProperties();
+    }, [router, supabase]);
 
     const filteredProperties = properties.filter(prop => {
-        const matchesSearch = prop.title?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = prop.title.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'Todos' || prop.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
-
+    
     const handleDeleteClick = (property) => {
         setPropertyToDelete(property);
     };
 
     const confirmDelete = async () => {
-        const supabase = createClient();
-        await supabase.from('properties').delete().eq('id', propertyToDelete.id);
-        setProperties(properties.filter(p => p.id !== propertyToDelete.id));
+        if (!propertyToDelete) return;
+        const { error } = await supabase.from('properties').delete().eq('id', propertyToDelete.id);
+        
+        if (error) {
+            alert("Erro ao apagar o imóvel: " + error.message);
+        } else {
+            setProperties(properties.filter(p => p.id !== propertyToDelete.id));
+        }
         setPropertyToDelete(null);
     };
 
@@ -226,12 +219,18 @@ export default function SellerDashboardPage() {
                 return 'bg-yellow-100 text-yellow-800';
             case 'Arrendado':
                 return 'bg-blue-100 text-blue-800';
-            case 'Rejeitado':
-                return 'bg-red-100 text-red-800';
             default:
                 return 'bg-gray-100 text-gray-800';
         }
     };
+    
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-100">
+                <LoaderCircle className="animate-spin text-purple-600" size={48} />
+            </div>
+        );
+    }
 
     if (selectedProperty) {
         return (
@@ -264,19 +263,21 @@ export default function SellerDashboardPage() {
                         <h1 className="text-3xl font-bold text-gray-800">O Meu Dashboard</h1>
                         <p className="mt-1 text-gray-500">Gestão dos seus anúncios de imóveis.</p>
                     </div>
-                    <button
-                        className="mt-4 md:mt-0 flex items-center px-5 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors shadow-md"
+                    <button 
                         onClick={() => router.push('/dashboard/adicionar-imovel')}
+                        className="mt-4 md:mt-0 flex items-center px-5 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors shadow-md"
                     >
                         <Plus size={20} className="mr-2" />
                         Publicar Novo Imóvel
                     </button>
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <StatCard icon={<Briefcase size={24} className="text-purple-600"/>} title="Total de Imóveis" value={properties.length} color="bg-purple-100"/>
                     <StatCard icon={<Eye size={24} className="text-blue-600"/>} title="Total de Visualizações" value={properties.reduce((acc, p) => acc + (p.views || 0), 0).toLocaleString()} color="bg-blue-100"/>
                     <StatCard icon={<MessageSquare size={24} className="text-green-600"/>} title="Novas Mensagens" value="5" color="bg-green-100"/>
                 </div>
+
                 <div className="bg-white rounded-xl shadow-md overflow-hidden">
                     <div className="p-4 border-b flex flex-col md:flex-row items-center justify-between gap-4">
                         <div className="relative w-full md:w-1/3">
@@ -301,7 +302,6 @@ export default function SellerDashboardPage() {
                                 <option>Ativo</option>
                                 <option>Pendente</option>
                                 <option>Arrendado</option>
-                                <option>Rejeitado</option>
                             </select>
                         </div>
                     </div>
@@ -321,13 +321,13 @@ export default function SellerDashboardPage() {
                                     <tr key={prop.id} onClick={() => setSelectedProperty(prop)} className="border-b hover:bg-gray-50 cursor-pointer">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center space-x-4">
-                                                <img src={prop.image} alt={prop.title} className="w-16 h-12 object-cover rounded-md"/>
+                                                <img src={prop.image_urls?.[0] || 'https://placehold.co/600x400/EEE/31343C?text=Sem+Imagem'} alt={prop.title} className="w-16 h-12 object-cover rounded-md"/>
                                                 <span className="font-medium text-gray-800">{prop.title}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusChip(prop.status)}`}>
-                                                {prop.status || 'Pendente'}
+                                                {prop.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 font-medium text-gray-700">{new Intl.NumberFormat().format(prop.price)}</td>
