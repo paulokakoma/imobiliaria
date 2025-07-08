@@ -4,10 +4,9 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, MapPin, BedDouble, Bath, Heart, ChevronDown, Building, Home, ArrowLeft, UserCircle, DollarSign, LoaderCircle, SearchX, SlidersHorizontal, X, LogOut, User as UserIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { fetchAllActiveProperties } from '@/lib/supabase/properties'
-import { fetchUserFavoriteIds, toggleFavoriteInDB } from '@/lib/supabase/favorites'
 
 // --- COMPONENTES DE UI ---
+// MUDANÇA: Todos os componentes foram movidos para fora do componente principal para corrigir o erro.
 
 const Header = ({ onShowFavorites }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -220,16 +219,21 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadInitialData = async () => {
         setIsLoading(true);
-        const propertiesData = await fetchAllActiveProperties();
+        const { data: propertiesData, error: propertiesError } = await supabase.from('properties').select('*');
+        if (propertiesError) { console.error("Erro ao buscar imóveis:", propertiesError); setIsLoading(false); return; }
+
         const { data: { user } } = await supabase.auth.getUser();
+        let finalProperties = propertiesData || [];
 
         if (user) {
-            const favoriteIds = await fetchUserFavoriteIds(user.id);
-            const propertiesWithFavorites = propertiesData.map(p => ({...p, favorited: favoriteIds.has(p.id)}));
-            setAllProperties(propertiesWithFavorites);
-        } else {
-            setAllProperties(propertiesData.map(p => ({...p, favorited: false})));
+            const { data: favorites, error: favError } = await supabase.from('favorites').select('property_id').eq('user_id', user.id);
+            if (!favError && favorites) {
+                const favoriteIds = new Set(favorites.map(f => f.property_id));
+                finalProperties = propertiesData.map(p => ({...p, favorited: favoriteIds.has(p.id)}));
+            }
         }
+        
+        setAllProperties(finalProperties.map(p => ({...p, favorited: p.favorited || false})));
         setIsLoading(false);
     };
     loadInitialData();
@@ -259,9 +263,18 @@ export default function HomeScreen() {
         setView(prev => ({...prev, data: {...prev.data, favorited: !isCurrentlyFavorited}}));
     }
 
-    const success = await toggleFavoriteInDB(user.id, propertyId, isCurrentlyFavorited);
-    if (!success) {
-        setAllProperties(originalProperties);
+    if (isCurrentlyFavorited) {
+        const { error } = await supabase.from('favorites').delete().match({ user_id: user.id, property_id: propertyId });
+        if (error) {
+            console.error("Erro ao desfavoritar:", error);
+            setAllProperties(originalProperties);
+        }
+    } else {
+        const { error } = await supabase.from('favorites').insert({ user_id: user.id, property_id: propertyId });
+        if (error) {
+            console.error("Erro ao favoritar:", error);
+            setAllProperties(originalProperties);
+        }
     }
   };
   
@@ -292,7 +305,7 @@ export default function HomeScreen() {
                         <h1 className="text-4xl md:text-5xl font-bold">Encontre o seu Próximo Lar</h1>
                         <p className="mt-4 text-lg text-white/90">A maior seleção de imóveis no coração de Angola.</p>
                         <div className="mt-8">
-                          <SearchAndFilterBar filters={filters} setFilters={setFilters} onOpenFilters={() => setIsFilterModalOpen(false)} onClearFilters={handleClearFilters} />
+                          <SearchAndFilterBar filters={filters} setFilters={setFilters} onOpenFilters={() => setIsFilterModalOpen(true)} onClearFilters={handleClearFilters} />
                         </div>
                     </div>
                 </section>
