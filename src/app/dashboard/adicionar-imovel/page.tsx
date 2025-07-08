@@ -39,15 +39,44 @@ const InputField = ({ icon, label, id, ...props }) => (
     </div>
 );
 
+const SelectField = ({ icon, label, id, value, onChange, options, disabled = false, ...props }) => (
+    <div>
+        <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+        <div className="relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                {icon}
+            </span>
+            <select id={id} value={value} onChange={onChange} disabled={disabled} {...props} className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none disabled:bg-gray-200">
+                <option value="" disabled>Selecione uma opção</option>
+                {options.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                ))}
+            </select>
+        </div>
+    </div>
+);
+
+const huamboData = {
+    "Huambo": ["Académico", "Centro da Cidade", "São João", "Aviação", "Calomanda", "Sassonde"],
+    "Caála": ["Centro de Caála", "Cuima", "Catata"],
+    "Bailundo": ["Centro de Bailundo", "Luvemba", "Bimbe", "Hengue"],
+};
+
 export default function AddPropertyPage() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [images, setImages] = useState([]);
+    const [submitting, setSubmitting] = useState(false);
+    
     const [imageFiles, setImageFiles] = useState([]);
+    const [imagePreviews, setImagePreviews] = useState([]);
+    
     const [title, setTitle] = useState("");
-    const [type, setType] = useState("");
+    const [listingType, setListingType] = useState('para_arrendar');
+    const [propertyType, setPropertyType] = useState("");
     const [price, setPrice] = useState("");
-    const [location, setLocation] = useState("");
+    const [municipality, setMunicipality] = useState("");
+    const [bairro, setBairro] = useState("");
+    const [availableBairros, setAvailableBairros] = useState([]);
     const [beds, setBeds] = useState("");
     const [baths, setBaths] = useState("");
     const [width, setWidth] = useState("");
@@ -57,6 +86,9 @@ export default function AddPropertyPage() {
     
     const router = useRouter();
     const supabase = createClient();
+
+    const propertyTypes = ['Apartamento', 'Vivenda', 'Moradia', 'Terreno', 'Loja', 'Armazém', 'Escritório', 'Quinta'];
+    const municipalities = Object.keys(huamboData);
 
     useEffect(() => {
         const checkUser = async () => {
@@ -71,20 +103,23 @@ export default function AddPropertyPage() {
         checkUser();
     }, [router, supabase]);
 
+    const handleMunicipalityChange = (e) => {
+        const selectedMunicipality = e.target.value;
+        setMunicipality(selectedMunicipality);
+        setBairro(""); 
+        setAvailableBairros(huamboData[selectedMunicipality] || []);
+    };
+
     const handleImageUpload = (e) => {
         const files = Array.from(e.target.files);
-        const newImageFiles = [...imageFiles, ...files];
-        setImageFiles(newImageFiles);
+        setImageFiles(prev => [...prev, ...files]);
 
-        const newImageUrls = files.map(file => ({
-            url: URL.createObjectURL(file),
-            name: file.name
-        }));
-        setImages(prev => [...prev, ...newImageUrls]);
+        const newImageUrls = files.map(file => URL.createObjectURL(file));
+        setImagePreviews(prev => [...prev, ...newImageUrls]);
     };
 
     const removeImage = (index) => {
-        setImages(images.filter((_, i) => i !== index));
+        setImagePreviews(imagePreviews.filter((_, i) => i !== index));
         setImageFiles(imageFiles.filter((_, i) => i !== index));
     };
 
@@ -104,38 +139,40 @@ export default function AddPropertyPage() {
             return;
         }
 
-        setLoading(true);
+        setSubmitting(true);
 
-        const imageUrls = [];
+        const uploadedImageUrls = [];
         for (const file of imageFiles) {
             const filePath = `${user.id}/${Date.now()}-${file.name}`;
+            // MUDANÇA: Corrigido o nome do bucket para 'property-images'
             const { error: uploadError } = await supabase.storage
-                .from('property_images')
+                .from('property-images')
                 .upload(filePath, file);
 
             if (uploadError) {
                 alert('Erro ao fazer upload da imagem: ' + uploadError.message);
-                setLoading(false);
+                setSubmitting(false);
                 return;
             }
             
-            const { data: { publicUrl } } = supabase.storage.from('property_images').getPublicUrl(filePath);
-            imageUrls.push(publicUrl);
+            const { data: { publicUrl } } = supabase.storage.from('property-images').getPublicUrl(filePath);
+            uploadedImageUrls.push(publicUrl);
         }
 
         const newProperty = {
             user_id: user.id,
             title,
-            type,
+            type: propertyType,
+            listing_type: listingType,
             price: Number(price),
-            location,
+            location: `${bairro}, ${municipality}`,
             beds: Number(beds),
             baths: Number(baths),
             width: Number(width),
             length: Number(length),
             description,
             amenities,
-            image_urls: imageUrls,
+            image_urls: uploadedImageUrls,
             status: 'Pendente',
         };
 
@@ -147,7 +184,7 @@ export default function AddPropertyPage() {
             alert('Imóvel cadastrado com sucesso! Aguardando aprovação.');
             router.push('/dashboard');
         }
-        setLoading(false);
+        setSubmitting(false);
     };
 
     if (loading) {
@@ -172,22 +209,30 @@ export default function AddPropertyPage() {
                     </div>
 
                     <form className="space-y-8" onSubmit={handleSubmit}>
+                        <FormSection title="Objetivo do Anúncio">
+                            <div className="flex rounded-lg bg-gray-100 p-1">
+                                <button type="button" onClick={() => setListingType('para_arrendar')} className={`w-1/2 py-2 rounded-md text-sm font-semibold transition-colors ${listingType === 'para_arrendar' ? 'bg-purple-600 text-white' : 'text-gray-600'}`}>Arrendar</button>
+                                <button type="button" onClick={() => setListingType('para_venda')} className={`w-1/2 py-2 rounded-md text-sm font-semibold transition-colors ${listingType === 'para_venda' ? 'bg-purple-600 text-white' : 'text-gray-600'}`}>Vender</button>
+                            </div>
+                        </FormSection>
                         <FormSection title="Informações Básicas">
                             <InputField icon={<FileText size={20}/>} label="Título do Anúncio" id="title" type="text" placeholder="Ex: Vivenda T3 com Quintal" value={title} onChange={e => setTitle(e.target.value)} required/>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <InputField icon={<Home size={20}/>} label="Tipo de Imóvel" id="type" type="text" placeholder="Apartamento, Vivenda, etc." value={type} onChange={e => setType(e.target.value)} required/>
-                                <InputField icon={<DollarSign size={20}/>} label="Preço (AOA/mês)" id="price" type="number" placeholder="150000" value={price} onChange={e => setPrice(e.target.value)} required/>
+                                <SelectField icon={<Home size={20}/>} label="Tipo de Imóvel" id="type" value={propertyType} onChange={e => setPropertyType(e.target.value)} options={propertyTypes} required/>
+                                <InputField icon={<DollarSign size={20}/>} label={listingType === 'para_arrendar' ? "Preço (AOA/mês)" : "Preço (AOA)"} id="price" type="number" min="0" placeholder="150000" value={price} onChange={e => setPrice(e.target.value)} required/>
                             </div>
-                            <InputField icon={<MapPin size={20}/>} label="Localização" id="location" type="text" placeholder="Bairro, Rua, etc." value={location} onChange={e => setLocation(e.target.value)} required/>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <SelectField icon={<MapPin size={20}/>} label="Município" id="municipality" value={municipality} onChange={handleMunicipalityChange} options={municipalities} required/>
+                                <SelectField icon={<MapPin size={20}/>} label="Bairro" id="bairro" value={bairro} onChange={e => setBairro(e.target.value)} options={availableBairros} disabled={!municipality} required/>
+                            </div>
                         </FormSection>
-
                         <FormSection title="Detalhes do Imóvel">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <InputField icon={<BedDouble size={20}/>} label="Quartos" id="beds" type="number" placeholder="3" value={beds} onChange={e => setBeds(e.target.value)} required/>
-                                <InputField icon={<Bath size={20}/>} label="Casas de Banho (WC)" id="baths" type="number" placeholder="2" value={baths} onChange={e => setBaths(e.target.value)} required/>
+                                <InputField icon={<BedDouble size={20}/>} label="Quartos" id="beds" type="number" min="0" placeholder="3" value={beds} onChange={e => setBeds(e.target.value)} required/>
+                                <InputField icon={<Bath size={20}/>} label="Casas de Banho (WC)" id="baths" type="number" min="0" placeholder="2" value={baths} onChange={e => setBaths(e.target.value)} required/>
                                 <div className="flex items-center space-x-2">
-                                    <InputField icon={<Ruler size={20}/>} label="Largura (m)" id="width" type="number" placeholder="15" value={width} onChange={e => setWidth(e.target.value)}/>
-                                    <InputField icon={<Ruler size={20}/>} label="Comprimento (m)" id="length" type="number" placeholder="20" value={length} onChange={e => setLength(e.target.value)}/>
+                                    <InputField icon={<Ruler size={20}/>} label="Largura (m)" id="width" type="number" min="0" placeholder="15" value={width} onChange={e => setWidth(e.target.value)}/>
+                                    <InputField icon={<Ruler size={20}/>} label="Comprimento (m)" id="length" type="number" min="0" placeholder="20" value={length} onChange={e => setLength(e.target.value)}/>
                                 </div>
                             </div>
                             <div>
@@ -195,7 +240,6 @@ export default function AddPropertyPage() {
                                 <textarea id="description" rows="4" className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Descreva os detalhes do seu imóvel..." value={description} onChange={e => setDescription(e.target.value)} required></textarea>
                             </div>
                         </FormSection>
-
                         <FormSection title="Comodidades">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {['Garagem', 'Quintal', 'Piscina', 'Ar Condicionado', 'Cozinha Equipada', 'Varanda', 'Segurança 24h', 'Elevador'].map(item => (
@@ -217,10 +261,10 @@ export default function AddPropertyPage() {
                                 </label>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                                {images.map((img, index) => (
+                                {imagePreviews.map((url, index) => (
                                     <div key={index} className="relative">
-                                        <img src={img.url} alt={img.name} className="w-full h-32 object-cover rounded-lg"/>
-                                        <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full">
+                                        <img src={url} alt={`Preview ${index}`} className="w-full h-32 object-cover rounded-lg"/>
+                                        <button type="button" onClick={() => removeImage(index)} className="absolute -top-2 -right-2 bg-red-600 text-white p-1 rounded-full">
                                             <X size={16}/>
                                         </button>
                                     </div>
@@ -229,8 +273,8 @@ export default function AddPropertyPage() {
                         </FormSection>
 
                         <div className="flex justify-end">
-                            <button type="submit" disabled={loading} className="flex items-center px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors shadow-md disabled:opacity-50">
-                                {loading ? <LoaderCircle size={20} className="animate-spin mr-2"/> : <Plus size={20} className="mr-2"/>}
+                            <button type="submit" disabled={submitting} className="flex items-center px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors shadow-md disabled:opacity-50">
+                                {submitting ? <LoaderCircle size={20} className="animate-spin mr-2"/> : <Plus size={20} className="mr-2"/>}
                                 Publicar Anúncio
                             </button>
                         </div>
