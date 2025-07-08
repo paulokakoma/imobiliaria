@@ -6,9 +6,8 @@ import { Search, MapPin, BedDouble, Bath, Heart, ChevronDown, Building, Home, Ar
 import { createClient } from '@/lib/supabase/client'
 
 // --- COMPONENTES DE UI ---
-// MUDANÇA: Todos os componentes foram movidos para fora do componente principal para corrigir o erro.
 
-const Header = ({ onShowFavorites }) => {
+const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [userProfile, setUserProfile] = useState(null);
     const router = useRouter();
@@ -48,14 +47,11 @@ const Header = ({ onShowFavorites }) => {
     return (
       <header className="bg-white shadow-sm sticky top-0 z-30">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => router.push('/screen')}>
             <Building className="text-purple-600" size={28} />
             <span className="text-xl font-bold text-gray-800">ImóveisHuambo</span>
           </div>
           <div className="flex items-center space-x-4">
-            <button onClick={onShowFavorites} className="p-2 rounded-full hover:bg-gray-100" title="Ver Favoritos">
-                <Heart size={24} className="text-gray-600"/>
-            </button>
             <div className="relative" ref={menuRef}>
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="rounded-full flex items-center justify-center h-10 w-10 bg-gray-100 hover:bg-gray-200">
                   {userProfile?.avatar_url ? (
@@ -162,51 +158,43 @@ const PropertyCard = ({ property, onClick, onToggleFavorite }) => (
         <Heart size={20} className={`transition-colors ${property.favorited ? 'text-red-500 fill-red-500' : 'text-gray-600 hover:text-red-500'}`} />
       </button>
     </div>
-    <div className="p-4">{/* ... */}</div>
+    <div className="p-4">
+      <h3 className="font-semibold text-lg text-gray-800 truncate">{property.title}</h3>
+      <p className="text-sm text-gray-500 flex items-center mt-1"><MapPin size={14} className="mr-1" /> {property.location}</p>
+      <div className="mt-4 flex justify-between items-center">
+        <p className="text-purple-600 font-bold text-lg">{new Intl.NumberFormat().format(property.price)} AOA</p>
+        <div className="text-sm text-gray-600 flex gap-3">
+          <span className="flex items-center"><BedDouble size={16} className="mr-1" /> {property.beds}</span>
+          <span className="flex items-center"><Bath size={16} className="mr-1" /> {property.baths}</span>
+        </div>
+      </div>
+    </div>
   </div>
 );
 
 const PropertyCardSkeleton = () => (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden">{/* ... */}</div>
-);
-
-const PropertyDetail = ({ property, onGoBack, onToggleFavorite, onContact }) => (
-  <div className="container mx-auto p-4 md:p-8">{/* ... */}</div>
+    <div className="bg-white rounded-xl shadow-md overflow-hidden animate-pulse">
+        <div className="w-full h-56 bg-gray-300"></div>
+        <div className="p-4 space-y-4">
+            <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+            <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+            <div className="flex justify-between items-center pt-2">
+                <div className="h-6 bg-gray-300 rounded w-1/3"></div>
+                <div className="flex space-x-4">
+                    <div className="h-5 w-10 bg-gray-300 rounded"></div>
+                    <div className="h-5 w-10 bg-gray-300 rounded"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 );
 
 const NoResultsFound = ({ onClearFilters }) => (
     <div className="text-center py-16">{/* ... */}</div>
 );
 
-const FavoritesView = ({ properties, onSelectProperty, onToggleFavorite, onGoBack }) => (
-    <main className="container mx-auto p-4 md:p-8 animate-fade-in">
-        <div className="flex items-center mb-6">
-             <button onClick={onGoBack} className="flex items-center text-purple-600 font-semibold hover:underline">
-                <ArrowLeft size={20} className="mr-2"/>
-                Voltar para a Lista Principal
-            </button>
-        </div>
-        <h2 className="text-3xl font-bold text-gray-800 mb-6">Meus Imóveis Favoritos</h2>
-        {properties.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {properties.map((property) => (
-                    <PropertyCard
-                        key={property.id}
-                        property={property}
-                        onToggleFavorite={onToggleFavorite}
-                        onClick={() => onSelectProperty(property)}
-                    />
-                ))}
-            </div>
-        ) : (
-            <p className="text-center text-gray-500 py-10">Ainda não adicionou nenhum imóvel aos seus favoritos.</p>
-        )}
-    </main>
-);
-
 export default function HomeScreen() {
   const [allProperties, setAllProperties] = useState([]);
-  const [view, setView] = useState({ name: 'list', data: null });
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -214,18 +202,19 @@ export default function HomeScreen() {
     priceRange: { min: '', max: '' }, adType: 'arrendar',
   });
 
+  const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
     const loadInitialData = async () => {
         setIsLoading(true);
-        const { data: propertiesData, error: propertiesError } = await supabase.from('properties').select('*');
-        if (propertiesError) { console.error("Erro ao buscar imóveis:", propertiesError); setIsLoading(false); return; }
-
+        const { data: propertiesData, error: propertiesError } = await supabase.from('properties').select('*'); 
+        if (propertiesError) { console.error("Erro ao buscar imóveis:", propertiesError); }
+        
         const { data: { user } } = await supabase.auth.getUser();
         let finalProperties = propertiesData || [];
 
-        if (user) {
+        if (user && propertiesData) {
             const { data: favorites, error: favError } = await supabase.from('favorites').select('property_id').eq('user_id', user.id);
             if (!favError && favorites) {
                 const favoriteIds = new Set(favorites.map(f => f.property_id));
@@ -252,16 +241,13 @@ export default function HomeScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
         alert("Por favor, faça login para favoritar imóveis.");
+        router.push('/login');
         return;
     }
 
     const originalProperties = [...allProperties];
     const updatedProperties = allProperties.map(p => p.id === propertyId ? { ...p, favorited: !isCurrentlyFavorited } : p);
     setAllProperties(updatedProperties);
-    
-    if(view.name === 'detail' && view.data?.id === propertyId) {
-        setView(prev => ({...prev, data: {...prev.data, favorited: !isCurrentlyFavorited}}));
-    }
 
     if (isCurrentlyFavorited) {
         const { error } = await supabase.from('favorites').delete().match({ user_id: user.id, property_id: propertyId });
@@ -280,65 +266,40 @@ export default function HomeScreen() {
   
   const handleClearFilters = () => { setFilters({ searchQuery: '', location: '', propertyType: 'Qualquer', priceRange: { min: '', max: '' }, adType: 'arrendar' }); setIsFilterModalOpen(false); };
 
-  const renderContent = () => {
-    switch(view.name) {
-        case 'detail':
-            return <PropertyDetail 
-                        property={view.data} 
-                        onGoBack={() => setView({ name: 'list', data: null })}
-                        onToggleFavorite={handleToggleFavorite}
-                        onContact={() => alert('Navegar para a tela de contacto')}
-                    />
-        case 'favorites':
-            return <FavoritesView
-                        properties={allProperties.filter(p => p.favorited)}
-                        onSelectProperty={(property) => setView({ name: 'detail', data: property })}
-                        onToggleFavorite={handleToggleFavorite}
-                        onGoBack={() => setView({ name: 'list', data: null })}
-                    />
-        default: // 'list'
-            return (
-              <>
-                <section className="relative bg-gray-800 h-80 flex items-center justify-center">
-                    <img src="https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=2670&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Fundo de casas"/>
-                    <div className="relative z-10 text-center text-white p-4">
-                        <h1 className="text-4xl md:text-5xl font-bold">Encontre o seu Próximo Lar</h1>
-                        <p className="mt-4 text-lg text-white/90">A maior seleção de imóveis no coração de Angola.</p>
-                        <div className="mt-8">
-                          <SearchAndFilterBar filters={filters} setFilters={setFilters} onOpenFilters={() => setIsFilterModalOpen(true)} onClearFilters={handleClearFilters} />
-                        </div>
-                    </div>
-                </section>
-                <FilterModal filters={filters} setFilters={setFilters} isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} onClearFilters={handleClearFilters}/>
-                <main className="container mx-auto px-4 pb-12 mt-8 relative z-10">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-6">Imóveis Disponíveis</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {isLoading
-                      ? Array(6).fill(0).map((_, i) => <PropertyCardSkeleton key={i} />)
-                      : filteredProperties.length > 0
-                      ? filteredProperties.map((property) => (
-                          <div key={property.id}>
-                            <PropertyCard
-                              property={property}
-                              onToggleFavorite={handleToggleFavorite}
-                              onClick={() => setView({ name: 'detail', data: property })}
-                            />
-                          </div>
-                        ))
-                      : <div className="col-span-full"><NoResultsFound onClearFilters={handleClearFilters} /></div>
-                    }
-                  </div>
-                </main>
-              </>
-            )
-    }
-  }
-
   return (
     <div className="bg-gray-50 min-h-screen">
-      <style>{`@keyframes shimmer { 100% { transform: translateX(100%); } }`}</style>
-      <Header onShowFavorites={() => setView({ name: 'favorites', data: null })} />
-      {renderContent()}
+      <Header onShowFavorites={() => alert("Funcionalidade de favoritos em desenvolvimento.")} />
+      
+      <section className="relative bg-gray-800 h-80 flex items-center justify-center">
+          <img src="https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=2670&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Fundo de casas"/>
+          <div className="relative z-10 text-center text-white p-4">
+              <h1 className="text-4xl md:text-5xl font-bold">Encontre o seu Próximo Lar</h1>
+              <p className="mt-4 text-lg text-white/90">A maior seleção de imóveis no coração de Angola.</p>
+              <div className="mt-8">
+                <SearchAndFilterBar filters={filters} setFilters={setFilters} onOpenFilters={() => setIsFilterModalOpen(true)} onClearFilters={handleClearFilters} />
+              </div>
+          </div>
+      </section>
+      <FilterModal filters={filters} setFilters={setFilters} isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} onClearFilters={handleClearFilters}/>
+      <main className="container mx-auto px-4 pb-12 mt-8 relative z-10">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Imóveis Disponíveis</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {isLoading
+            ? Array(12).fill(0).map((_, i) => <PropertyCardSkeleton key={i} />)
+            : filteredProperties.length > 0
+            ? filteredProperties.map((property) => (
+                <div key={property.id}>
+                  <PropertyCard
+                    property={property}
+                    onToggleFavorite={handleToggleFavorite}
+                    onClick={() => router.push(`/properties/${property.id}`)}
+                  />
+                </div>
+              ))
+            : <div className="col-span-full"><NoResultsFound onClearFilters={handleClearFilters} /></div>
+          }
+        </div>
+      </main>
     </div>
   );
 }
