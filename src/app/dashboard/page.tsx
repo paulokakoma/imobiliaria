@@ -82,58 +82,6 @@ const DeleteConfirmationModal = ({ propertyTitle, onConfirm, onCancel }) => (
     </div>
 );
 
-const PropertyDetailView = ({ property, onGoBack, showEditButton = false }) => (
-    <div className="container mx-auto p-4 md:p-8 animate-fade-in">
-        <div className="flex justify-between items-center mb-6">
-            <button onClick={onGoBack} className="flex items-center text-purple-600 font-semibold hover:underline">
-                <ArrowLeft size={20} className="mr-2"/>
-                Voltar para o Dashboard
-            </button>
-            {showEditButton && (
-                <button className="flex items-center px-4 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 shadow-sm transition-colors">
-                    <Edit size={18} className="mr-2"/>
-                    Editar Anúncio
-                </button>
-            )}
-        </div>
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <img src={property.image_urls?.[0] || 'https://placehold.co/600x400/EEE/31343C?text=Sem+Imagem'} alt={property.title} className="w-full h-64 object-cover"/>
-            <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-800">{property.title}</h2>
-                <div className="flex items-center text-gray-500 mt-2"><MapPin size={16} className="mr-2" /><p>{property.location}</p></div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6 text-center">
-                    <div className="bg-gray-100 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500">Status</p>
-                        <p className="text-lg font-bold text-gray-800">{property.status}</p>
-                    </div>
-                    <div className="bg-gray-100 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500">Preço (AOA/mês)</p>
-                        <p className="text-lg font-bold text-purple-600">{new Intl.NumberFormat().format(property.price)}</p>
-                    </div>
-                    <div className="bg-gray-100 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500">Visualizações</p>
-                        <p className="text-lg font-bold text-gray-800">{property.views || 0}</p>
-                    </div>
-                    <div className="bg-gray-100 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500">Contactos</p>
-                        <p className="text-lg font-bold text-gray-800">15</p>
-                    </div>
-                </div>
-                <div>
-                    <h3 className="font-semibold text-gray-800 mb-2">Descrição</h3>
-                    <p className="text-gray-600 leading-relaxed">{property.description}</p>
-                </div>
-                <div className="mt-6">
-                    <h3 className="font-semibold text-gray-800 mb-3">Comodidades</h3>
-                    <div className="flex flex-wrap gap-2">
-                        {property.amenities.map(item => <span key={item} className="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full">{item}</span>)}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
 const StatCard = ({ icon, title, value, color }) => (
     <div className="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
         <div className={`p-3 rounded-full ${color}`}>
@@ -150,7 +98,6 @@ const StatCard = ({ icon, title, value, color }) => (
 export default function SellerDashboardPage() {
     const [properties, setProperties] = useState([]);
     const [propertyToDelete, setPropertyToDelete] = useState(null);
-    const [selectedProperty, setSelectedProperty] = useState(null); 
     const [loading, setLoading] = useState(true);
     
     const [searchTerm, setSearchTerm] = useState('');
@@ -232,19 +179,6 @@ export default function SellerDashboardPage() {
         );
     }
 
-    if (selectedProperty) {
-        return (
-            <div className="bg-gray-50 min-h-screen">
-                <Header />
-                <PropertyDetailView 
-                    property={selectedProperty} 
-                    onGoBack={() => setSelectedProperty(null)}
-                    showEditButton={true} 
-                />
-            </div>
-        );
-    }
-
     return (
         <div className="bg-gray-50 min-h-screen">
             <Header />
@@ -318,7 +252,7 @@ export default function SellerDashboardPage() {
                             </thead>
                             <tbody>
                                 {filteredProperties.map(prop => (
-                                    <tr key={prop.id} onClick={() => setSelectedProperty(prop)} className="border-b hover:bg-gray-50 cursor-pointer">
+                                    <tr key={prop.id} className="border-b hover:bg-gray-50">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center space-x-4">
                                                 <img src={prop.image_urls?.[0] || 'https://placehold.co/600x400/EEE/31343C?text=Sem+Imagem'} alt={prop.title} className="w-16 h-12 object-cover rounded-md"/>
