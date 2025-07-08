@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building, Home, DollarSign, BedDouble, Bath, Ruler, FileText, Plus, Upload, X, ArrowLeft, MapPin } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Building, Home, DollarSign, BedDouble, Bath, Ruler, FileText, Plus, Upload, X, ArrowLeft, MapPin, LoaderCircle } from 'lucide-react'
 
 // --- COMPONENTES ---
 
@@ -14,16 +14,11 @@ const Header = () => (
         <Building className="text-purple-600" size={28} />
         <span className="text-xl font-bold text-gray-800">ImóveisHuambo</span>
       </div>
-      {/* Aqui poderia ter um menu de perfil do vendedor */}
     </div>
   </header>
 );
 
-interface FormSectionProps {
-  title: string;
-  children: React.ReactNode;
-}
-const FormSection = ({ title, children }: FormSectionProps) => (
+const FormSection = ({ title, children }) => (
     <div className="bg-white p-6 rounded-xl shadow-md">
         <h3 className="text-lg font-semibold text-gray-800 border-b pb-3 mb-4">{title}</h3>
         <div className="space-y-4">
@@ -32,65 +27,68 @@ const FormSection = ({ title, children }: FormSectionProps) => (
     </div>
 );
 
-interface InputFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  icon: React.ReactNode;
-  label: string;
-  id: string;
-}
-const InputField = ({ icon, label, id, ...props }: InputFieldProps) => (
+const InputField = ({ icon, label, id, ...props }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                 {icon}
             </span>
-            <input id={id} {...props} className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            <input id={id} {...props} className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"/>
         </div>
     </div>
 );
 
-
-
-interface ImageItem {
-  url: string;
-  name: string;
-}
-
 export default function AddPropertyPage() {
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [images, setImages] = useState<ImageItem[]>([]);
+    const [images, setImages] = useState([]);
+    const [imageFiles, setImageFiles] = useState([]);
     const [title, setTitle] = useState("");
     const [type, setType] = useState("");
     const [price, setPrice] = useState("");
     const [location, setLocation] = useState("");
     const [beds, setBeds] = useState("");
     const [baths, setBaths] = useState("");
-    const [area, setArea] = useState("");
+    const [width, setWidth] = useState("");
+    const [length, setLength] = useState("");
     const [description, setDescription] = useState("");
-    const [amenities, setAmenities] = useState<string[]>([]);
-    // MUDANÇA: Reativado o hook para navegação
+    const [amenities, setAmenities] = useState([]);
+    
     const router = useRouter();
+    const supabase = createClient();
 
-    // Simula um loading inicial para UX melhor
     useEffect(() => {
-        const timeout = setTimeout(() => setLoading(false), 400); // 400ms para UX
-        return () => clearTimeout(timeout);
-    }, []);
+        const checkUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.push('/login');
+            } else {
+                setUser(user);
+                setLoading(false);
+            }
+        };
+        checkUser();
+    }, [router, supabase]);
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        const newImages = files.map((file) => ({
-            url: URL.createObjectURL(file as Blob),
-            name: (file as File).name
+    const handleImageUpload = (e) => {
+        const files = Array.from(e.target.files);
+        const newImageFiles = [...imageFiles, ...files];
+        setImageFiles(newImageFiles);
+
+        const newImageUrls = files.map(file => ({
+            url: URL.createObjectURL(file),
+            name: file.name
         }));
-        setImages((prev) => [...prev, ...newImages]);
+        setImages(prev => [...prev, ...newImageUrls]);
     };
 
-    const removeImage = (index: number) => {
+    const removeImage = (index) => {
         setImages(images.filter((_, i) => i !== index));
+        setImageFiles(imageFiles.filter((_, i) => i !== index));
     };
 
-    const handleAmenityChange = (amenity: string) => {
+    const handleAmenityChange = (amenity) => {
         setAmenities((prev) =>
             prev.includes(amenity)
                 ? prev.filter((a) => a !== amenity)
@@ -98,56 +96,68 @@ export default function AddPropertyPage() {
         );
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const supabase = createClient();
-        // Recupera usuário logado do localStorage
-        let user = null;
-        if (typeof window !== 'undefined') {
-            const stored = localStorage.getItem('user');
-            if (stored) user = JSON.parse(stored);
-        }
-        if (!user || !user.email) {
-            alert('Você precisa estar logado para cadastrar um imóvel.');
+        if (!user) {
+            alert('Sessão expirada. Por favor, faça login novamente.');
             router.push('/login');
             return;
         }
-        // Prepara os dados para o Supabase
+
+        setLoading(true);
+
+        const imageUrls = [];
+        for (const file of imageFiles) {
+            const filePath = `${user.id}/${Date.now()}-${file.name}`;
+            const { error: uploadError } = await supabase.storage
+                .from('property_images')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                alert('Erro ao fazer upload da imagem: ' + uploadError.message);
+                setLoading(false);
+                return;
+            }
+            
+            const { data: { publicUrl } } = supabase.storage.from('property_images').getPublicUrl(filePath);
+            imageUrls.push(publicUrl);
+        }
+
         const newProperty = {
+            user_id: user.id,
             title,
             type,
             price: Number(price),
             location,
             beds: Number(beds),
             baths: Number(baths),
-            area: Number(area),
+            width: Number(width),
+            length: Number(length),
             description,
             amenities,
-            image: images[0]?.url || '',
-            owner: user.email,
+            image_urls: imageUrls,
+            status: 'Pendente',
         };
-        // Insere no Supabase
-        const { error } = await supabase.from('properties').insert([newProperty]);
-        if (error) {
-            alert('Erro ao cadastrar imóvel: ' + error.message);
-            return;
+
+        const { error: insertError } = await supabase.from('properties').insert([newProperty]);
+
+        if (insertError) {
+            alert('Erro ao cadastrar imóvel: ' + insertError.message);
+        } else {
+            alert('Imóvel cadastrado com sucesso! Aguardando aprovação.');
+            router.push('/dashboard');
         }
-        router.push('/screen');
+        setLoading(false);
     };
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                <div className="flex flex-col items-center">
-                    <svg className="animate-spin h-10 w-10 text-purple-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                    </svg>
-                    <span className="text-gray-700 font-semibold">Carregando formulário...</span>
-                </div>
+                <LoaderCircle className="animate-spin h-10 w-10 text-purple-600" />
             </div>
         );
     }
+
     return (
         <div className="bg-gray-50 min-h-screen">
             <Header />
@@ -155,49 +165,48 @@ export default function AddPropertyPage() {
                 <div className="max-w-4xl mx-auto">
                     <div className="flex items-center justify-between mb-8">
                         <h1 className="text-3xl font-bold text-gray-800">Publicar Novo Imóvel</h1>
-                        {/* MUDANÇA: Adicionada a função de clique para navegar */}
-                        <button 
-                            onClick={() => router.push('/dashboard')} 
-                            className="flex items-center text-gray-600 hover:text-purple-600 font-semibold"
-                        >
+                        <button onClick={() => router.push('/dashboard')} className="flex items-center text-gray-600 hover:text-purple-600 font-semibold">
                             <ArrowLeft size={20} className="mr-2"/>
                             Voltar para o Dashboard
                         </button>
                     </div>
+
                     <form className="space-y-8" onSubmit={handleSubmit}>
-                        {/* Informações Básicas */}
                         <FormSection title="Informações Básicas">
-                            <InputField icon={<FileText size={20}/>} label="Título do Anúncio" id="title" type="text" placeholder="Ex: Vivenda T3 com Quintal" value={title} onChange={e => setTitle(e.target.value)} />
+                            <InputField icon={<FileText size={20}/>} label="Título do Anúncio" id="title" type="text" placeholder="Ex: Vivenda T3 com Quintal" value={title} onChange={e => setTitle(e.target.value)} required/>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <InputField icon={<Home size={20}/>} label="Tipo de Imóvel" id="type" type="text" placeholder="Apartamento, Vivenda, etc." value={type} onChange={e => setType(e.target.value)} />
-                                <InputField icon={<DollarSign size={20}/>} label="Preço (AOA/mês)" id="price" type="number" placeholder="150000" value={price} onChange={e => setPrice(e.target.value)} />
+                                <InputField icon={<Home size={20}/>} label="Tipo de Imóvel" id="type" type="text" placeholder="Apartamento, Vivenda, etc." value={type} onChange={e => setType(e.target.value)} required/>
+                                <InputField icon={<DollarSign size={20}/>} label="Preço (AOA/mês)" id="price" type="number" placeholder="150000" value={price} onChange={e => setPrice(e.target.value)} required/>
                             </div>
-                            <InputField icon={<MapPin size={20}/>} label="Localização" id="location" type="text" placeholder="Bairro, Rua, etc." value={location} onChange={e => setLocation(e.target.value)} />
+                            <InputField icon={<MapPin size={20}/>} label="Localização" id="location" type="text" placeholder="Bairro, Rua, etc." value={location} onChange={e => setLocation(e.target.value)} required/>
                         </FormSection>
-                        {/* Detalhes do Imóvel */}
+
                         <FormSection title="Detalhes do Imóvel">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <InputField icon={<BedDouble size={20}/>} label="Quartos" id="beds" type="number" placeholder="3" value={beds} onChange={e => setBeds(e.target.value)} />
-                                <InputField icon={<Bath size={20}/>} label="Casas de Banho (WC)" id="baths" type="number" placeholder="2" value={baths} onChange={e => setBaths(e.target.value)} />
-                                <InputField icon={<Ruler size={20}/>} label="Área (m²)" id="area" type="number" placeholder="120" value={area} onChange={e => setArea(e.target.value)} />
+                                <InputField icon={<BedDouble size={20}/>} label="Quartos" id="beds" type="number" placeholder="3" value={beds} onChange={e => setBeds(e.target.value)} required/>
+                                <InputField icon={<Bath size={20}/>} label="Casas de Banho (WC)" id="baths" type="number" placeholder="2" value={baths} onChange={e => setBaths(e.target.value)} required/>
+                                <div className="flex items-center space-x-2">
+                                    <InputField icon={<Ruler size={20}/>} label="Largura (m)" id="width" type="number" placeholder="15" value={width} onChange={e => setWidth(e.target.value)}/>
+                                    <InputField icon={<Ruler size={20}/>} label="Comprimento (m)" id="length" type="number" placeholder="20" value={length} onChange={e => setLength(e.target.value)}/>
+                                </div>
                             </div>
                             <div>
                                 <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                                <textarea id="description" rows={4} className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Descreva os detalhes do seu imóvel..." value={description} onChange={e => setDescription(e.target.value)} />
+                                <textarea id="description" rows="4" className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Descreva os detalhes do seu imóvel..." value={description} onChange={e => setDescription(e.target.value)} required></textarea>
                             </div>
                         </FormSection>
-                        {/* Comodidades */}
+
                         <FormSection title="Comodidades">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {['Garagem', 'Quintal', 'Piscina', 'Ar Condicionado', 'Cozinha Equipada', 'Varanda', 'Segurança 24h', 'Elevador'].map(item => (
                                     <div key={item} className="flex items-center">
-                                        <input id={item} type="checkbox" className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" checked={amenities.includes(item)} onChange={() => handleAmenityChange(item)} />
+                                        <input id={item} type="checkbox" className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" checked={amenities.includes(item)} onChange={() => handleAmenityChange(item)}/>
                                         <label htmlFor={item} className="ml-2 text-gray-700">{item}</label>
                                     </div>
                                 ))}
                             </div>
                         </FormSection>
-                        {/* Upload de Imagens */}
+                        
                         <FormSection title="Galeria de Imagens">
                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                                 <Upload size={48} className="mx-auto text-gray-400"/>
@@ -210,7 +219,6 @@ export default function AddPropertyPage() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                                 {images.map((img, index) => (
                                     <div key={index} className="relative">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={img.url} alt={img.name} className="w-full h-32 object-cover rounded-lg"/>
                                         <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full">
                                             <X size={16}/>
@@ -219,9 +227,10 @@ export default function AddPropertyPage() {
                                 ))}
                             </div>
                         </FormSection>
+
                         <div className="flex justify-end">
-                            <button type="submit" className="flex items-center px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors shadow-md">
-                                <Plus size={20} className="mr-2"/>
+                            <button type="submit" disabled={loading} className="flex items-center px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors shadow-md disabled:opacity-50">
+                                {loading ? <LoaderCircle size={20} className="animate-spin mr-2"/> : <Plus size={20} className="mr-2"/>}
                                 Publicar Anúncio
                             </button>
                         </div>
