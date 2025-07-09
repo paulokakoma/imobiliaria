@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
@@ -27,10 +27,9 @@ interface Property {
 }
 
 // Inicializar Supabase
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- COMPONENTES DE UI ---
 
@@ -127,7 +126,12 @@ const ActivityItem = ({ icon, text, time }: { icon: React.ReactNode, text: strin
     </div>
 );
 
-const PropertyListItem = ({ property, onViewDetails, onDelete, onEdit }) => (
+const PropertyListItem = ({ property, onViewDetails, onEdit, onDelete }: { 
+    property: Property, 
+    onViewDetails: () => void, 
+    onEdit: () => void,
+    onDelete: () => void 
+}) => (
     <div onClick={onViewDetails} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 cursor-pointer hover:border-purple-300">
         <img src={property.image_urls?.[0] || 'https://placehold.co/200x150/f3f4f6/31343C?text=Imóvel'} alt={property.title} className="w-full sm:w-32 h-24 object-cover rounded-md" />
         <div className="flex-grow">
@@ -172,9 +176,9 @@ const ErrorScreen = ({ message }: { message: string }) => (
 
 // --- VISTAS DO DASHBOARD ---
 
-const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDelete }) => (
+const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDelete, onEdit }) => (
     <>
-        <DashboardHeader onAddNew={() => window.location.href = '/dashboard/adicionar-imovel'} title="Bem-vindo de volta!" subtitle="Aqui está um resumo da sua atividade." />
+        <DashboardHeader onAddNew={() => alert("Navegar para Adicionar Imóvel")} title="Bem-vindo de volta!" subtitle="Aqui está um resumo da sua atividade." />
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
             <StatCard icon={<Building2 size={24} />} title="Imóveis Ativos" value={stats.activeListings} detail={`${stats.pendingListings} pendente(s)`} color="from-purple-500 to-indigo-600" />
             <StatCard icon={<Eye size={24} />} title="Total de Visitas" value={stats.totalViews} detail="Este mês" color="from-blue-400 to-cyan-500" />
@@ -186,7 +190,7 @@ const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDel
                 <div className="space-y-4">
                    {properties.length > 0 ? (
                         properties.slice(0, 3).map(prop => (
-                            <PropertyListItem key={prop.id} property={prop} onViewDetails={() => onViewDetails(prop.id)} onDelete={() => onDelete(prop.id)} />
+                            <PropertyListItem key={prop.id} property={prop} onViewDetails={() => onViewDetails(prop.id)} onDelete={() => onDelete(prop.id)} onEdit={() => onEdit(prop.id)} />
                         ))
                    ) : (
                         <div className="bg-white p-8 rounded-lg text-center text-gray-500"><p>Ainda não publicou nenhum imóvel.</p></div>
@@ -205,7 +209,7 @@ const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDel
 
 const MyPropertiesView = ({ properties, onViewDetails, onDelete, onEdit }) => (
     <>
-        <DashboardHeader onAddNew={() => window.location.href = '/dashboard/adicionar-imovel'} title="Meus Imóveis" subtitle="Gira todos os seus anúncios publicados." />
+        <DashboardHeader onAddNew={() => alert("Navegar para Adicionar Imóvel")} title="Meus Imóveis" subtitle="Gira todos os seus anúncios publicados." />
         <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
             <div className="space-y-4">
                 {properties.length > 0 ? (
@@ -231,7 +235,7 @@ const PlaceholderView = ({ title }: { title: string }) => (
 
 
 // --- COMPONENTE PRINCIPAL ---
-export default function SellerDashboardPage() {
+export default function CreativeDashboardPage() {
     const [user, setUser] = useState<User | null>(null);
     const [properties, setProperties] = useState<Property[]>([]);
     const [activities, setActivities] = useState<any[]>([]);
@@ -240,9 +244,8 @@ export default function SellerDashboardPage() {
     const [currentPage, setCurrentPage] = useState('dashboard');
     const router = useRouter();
     
-    // MUDANÇA: Lógica de autenticação e busca de dados reativada e centralizada.
     useEffect(() => {
-        const fetchUserData = async () => {
+        const checkAuthAndFetchData = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 router.push('/login');
@@ -266,11 +269,12 @@ export default function SellerDashboardPage() {
             setActivities([
                 { id: 1, icon: <MessageSquare size={20} className="text-green-600"/>, text: "Nova mensagem sobre 'Vivenda V3 no Centro'", time: "há 5 minutos" },
                 { id: 2, icon: <Eye size={20} className="text-blue-600"/>, text: "O seu anúncio 'Apartamento T2' recebeu 25 novas visitas.", time: "há 2 horas" },
+                { id: 3, icon: <Tag size={20} className="text-orange-600"/>, text: "Recebeu uma nova proposta para 'Loja na Baixa'.", time: "há 1 dia" },
             ]);
-
             setLoading(false);
         };
-        fetchUserData();
+
+        checkAuthAndFetchData();
     }, [router]);
     
     const stats = useMemo(() => {
@@ -302,10 +306,9 @@ export default function SellerDashboardPage() {
             }
         }
     };
-    
+
     const handleEdit = (propertyId: string) => {
-        // No futuro, esta função levará para uma página de edição
-        alert(`Navegar para a edição do imóvel ${propertyId}`);
+        router.push(`/dashboard/editar-imovel/${propertyId}`);
     };
 
     const renderContent = () => {
@@ -320,7 +323,7 @@ export default function SellerDashboardPage() {
                 router.push('/profile');
                 return null;
             default:
-                return <MainDashboardView stats={stats} properties={properties} activities={activities} onViewDetails={handleViewDetails} onDelete={handleDelete} />;
+                return <MainDashboardView stats={stats} properties={properties} activities={activities} onViewDetails={handleViewDetails} onDelete={handleDelete} onEdit={handleEdit} />;
         }
     };
 
