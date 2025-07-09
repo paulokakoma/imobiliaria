@@ -52,29 +52,29 @@ export default function LoginPage() {
     setMessage(null)
 
     if (view === 'signup') {
-      const isAdminSignUp = email === 'paulokakoma19@gmail.com' && password === '998800'
-      const userRole = isAdminSignUp ? 'admin' : 'vendedor_anunciante'
-
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            first_name: isAdminSignUp ? 'Admin' : firstName,
-            last_name: isAdminSignUp ? 'User' : lastName,
-            full_name: isAdminSignUp ? 'Admin User' : `${firstName} ${lastName}`,
-            role: userRole,
+            first_name: firstName,
+            last_name: lastName,
+            full_name: `${firstName} ${lastName}`,
+            role: 'vendedor_anunciante', // Todos os novos cadastros são de vendedores
           },
         },
       })
 
       if (signUpError) {
         setError(signUpError.message)
-      } else {
-        setMessage('Cadastro realizado com sucesso! A redirecionar...')
+      } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+        setError("Já existe um utilizador com este e-mail. Se a conta for sua, tente fazer o login.");
+      } else if (data.user) {
+        // MUDANÇA: Redireciona o utilizador diretamente após o cadastro.
+        setMessage('Cadastro realizado com sucesso! A redirecionar para o seu dashboard...');
         setTimeout(() => {
-          router.push(isAdminSignUp ? '/admin' : '/dashboard')
-        }, 1500)
+            router.push('/dashboard');
+        }, 1500);
       }
 
     } else if (view === 'login') {
@@ -182,7 +182,7 @@ export default function LoginPage() {
           {view !== 'recover' && (
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><Lock size={20} /></span>
-              <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" required minLength={4} className="w-full pl-10 pr-10 py-2 bg-gray-50 border border-gray-300 rounded-lg" />
+              <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" required minLength={6} className="w-full pl-10 pr-10 py-2 bg-gray-50 border border-gray-300 rounded-lg" />
               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
             </div>
           )}
