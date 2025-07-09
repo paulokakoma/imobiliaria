@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation' 
 import { ArrowRight } from 'lucide-react'
 
-// MUDANÇA: Adicionadas mais imagens e mensagens
 const slides = [
   {
     image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=2670&auto=format&fit=crop',
@@ -43,11 +42,6 @@ export default function WelcomeScreen() {
 
     return () => clearTimeout(timer)
   }, [currentSlide])
-
-  const handleContinue = () => {
-    // De acordo com o plano, esta tela leva para a escolha de perfil
-    router.push('/escolher-perfil') 
-  }
 
   return (
     <main className="bg-white w-full h-screen">
@@ -88,15 +82,16 @@ export default function WelcomeScreen() {
           </div>
 
           <div className="absolute bottom-12 left-0 right-0 z-10 flex justify-center">
-            <button 
-              onClick={handleContinue}
+            {/* MUDANÇA: O botão agora é um link <a> para forçar o recarregamento da página */}
+            <a 
+              href="/escolher-perfil"
               className="relative overflow-hidden flex items-center justify-center px-8 py-4 bg-white/10 backdrop-blur-md rounded-full shadow-lg border border-white/20 text-white font-semibold text-lg transition-transform hover:scale-105"
             >
               <span className="mr-2">Continuar</span>
               <ArrowRight size={22} />
               
               <span className="absolute top-0 left-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[pulse-light_2s_ease-in-out_infinite]"></span>
-            </button>
+            </a>
           </div>
         </div>
       </div>

@@ -7,7 +7,8 @@ import { User } from '@supabase/supabase-js';
 import {
     LayoutDashboard, Building2, MessageSquare, Bell, Settings, LogOut,
     Plus, Search, ChevronDown, ChevronUp, Eye, Tag, DollarSign,
-    ArrowRight, Briefcase, UserCircle, LoaderCircle, X, MapPin, BedDouble, Bath, Trash2
+    ArrowRight, Briefcase, UserCircle, LoaderCircle, X, MapPin, BedDouble, Bath, Trash2,
+    CheckCircle, XCircle, ShieldCheck, ShieldOff // Adicionados os ícones necessários
 } from 'lucide-react';
 
 // Tipos
@@ -20,7 +21,7 @@ interface Property {
     bathrooms: number;
     address: string;
     image_urls?: string[];
-    status: 'Ativo' | 'Inativo' | 'Pendente';
+    status: 'Ativo' | 'Inativo' | 'Pendente' | 'Rejeitado';
     views?: number;
     created_at: string;
     user_id: string;
@@ -38,7 +39,7 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user }: { activePage: strin
         <div className="p-6 border-b border-gray-200">
             <div className="flex items-center space-x-3">
                 <Building2 className="text-purple-600" size={32} />
-                <span className="text-2xl font-bold">Imóveis<span className="text-purple-600">Huambo</span></span>
+                <span className="text-2xl font-bold">Admin</span>
             </div>
         </div>
         <nav className="flex-grow p-4 space-y-2">
@@ -48,26 +49,10 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user }: { activePage: strin
             </a>
             <a href="#" onClick={() => onNavigate('imoveis')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'imoveis' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <Briefcase size={20} className="mr-3" />
-                Meus Imóveis
-            </a>
-            <a href="#" onClick={() => onNavigate('mensagens')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'mensagens' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <MessageSquare size={20} className="mr-3" />
-                Mensagens
-            </a>
-            <a href="#" onClick={() => onNavigate('notificacoes')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'notificacoes' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <Bell size={20} className="mr-3" />
-                Notificações
+                Gerir Imóveis
             </a>
         </nav>
         <div className="p-4 border-t border-gray-200">
-            <div className="px-4 py-3 mb-2 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">ID de Partilha:</p>
-                <p className="text-xs font-mono text-gray-700 break-all">{user?.id || 'admin-id-placeholder'}</p>
-            </div>
-            <a href="#" onClick={() => onNavigate('perfil')} className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
-                <UserCircle size={20} className="mr-3" />
-                Meu Perfil
-            </a>
             <a href="#" onClick={onLogout} className="flex items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg">
                 <LogOut size={20} className="mr-3" />
                 Sair
@@ -126,17 +111,30 @@ const ActivityItem = ({ icon, text, time }: { icon: React.ReactNode, text: strin
     </div>
 );
 
-const PropertyListItem = ({ property, onViewDetails, onDelete }: { 
+const ToggleSwitch = ({ checked, onChange }) => (
+    <button
+        onClick={(e) => { e.stopPropagation(); onChange(); }}
+        className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 ${checked ? 'bg-purple-600' : 'bg-gray-300'}`}
+    >
+        <span
+            className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ease-in-out ${checked ? 'translate-x-6' : 'translate-x-1'}`}
+        />
+    </button>
+);
+
+
+const PropertyListItem = ({ property, onViewDetails, onDelete, onStatusChange }: { 
     property: Property, 
     onViewDetails: () => void, 
-    onDelete: () => void 
+    onDelete: () => void,
+    onStatusChange: (id: string, status: 'Ativo' | 'Inativo' | 'Pendente' | 'Rejeitado') => void
 }) => (
     <div onClick={onViewDetails} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 cursor-pointer hover:border-purple-300">
         <img src={property.image_urls?.[0] || 'https://placehold.co/200x150/f3f4f6/31343C?text=Imóvel'} alt={property.title} className="w-full sm:w-32 h-24 object-cover rounded-md" />
         <div className="flex-grow">
             <div className="flex justify-between items-start">
                 <h4 className="font-bold text-lg text-gray-800">{property.title}</h4>
-                <span className={`px-3 py-1 text-xs font-semibold rounded-full ${property.status === 'Ativo' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                <span className={`px-3 py-1 text-xs font-semibold rounded-full ${property.status === 'Ativo' ? 'bg-green-100 text-green-800' : property.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
                     {property.status}
                 </span>
             </div>
@@ -148,6 +146,17 @@ const PropertyListItem = ({ property, onViewDetails, onDelete }: {
             <p className="text-purple-600 font-semibold text-lg mt-2">{new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(property.price)}</p>
         </div>
         <div className="flex space-x-2 self-end sm:self-center">
+            {property.status === 'Pendente' ? (
+                <>
+                    <button onClick={(e) => { e.stopPropagation(); onStatusChange(property.id, 'Ativo'); }} className="p-2 text-green-600 hover:bg-green-50 rounded-full" title="Aprovar"><CheckCircle size={18}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); onStatusChange(property.id, 'Rejeitado'); }} className="p-2 text-red-600 hover:bg-red-50 rounded-full" title="Rejeitar"><XCircle size={18}/></button>
+                </>
+            ) : (
+                <ToggleSwitch
+                    checked={property.status === 'Ativo'}
+                    onChange={() => onStatusChange(property.id, property.status === 'Ativo' ? 'Inativo' : 'Ativo')}
+                />
+            )}
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full"><Trash2 size={18}/></button>
         </div>
     </div>
@@ -162,21 +171,11 @@ const LoadingScreen = () => (
     </div>
 );
 
-const ErrorScreen = ({ message }: { message: string }) => (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
-        <div className="text-center bg-white p-10 rounded-lg shadow-md">
-            <X size={48} className="mx-auto text-red-400" />
-            <h3 className="mt-4 text-xl font-semibold text-red-800">Ocorreu um Erro</h3>
-            <p className="mt-1 text-gray-500">{message}</p>
-        </div>
-    </div>
-);
-
 // --- VISTAS DO DASHBOARD ---
 
-const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDelete }) => (
+const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDelete, onStatusChange }) => (
     <>
-        <DashboardHeader onAddNew={() => alert("Navegar para Adicionar Imóvel")} title="Bem-vindo de volta!" subtitle="Aqui está um resumo da sua atividade." />
+        <DashboardHeader title="Bem-vindo de volta!" subtitle="Aqui está um resumo da sua atividade." />
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
             <StatCard icon={<Building2 size={24} />} title="Imóveis Ativos" value={stats.activeListings} detail={`${stats.pendingListings} pendente(s)`} color="from-purple-500 to-indigo-600" />
             <StatCard icon={<Eye size={24} />} title="Total de Visitas" value={stats.totalViews} detail="Este mês" color="from-blue-400 to-cyan-500" />
@@ -189,7 +188,7 @@ const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDel
                 <div className="space-y-4">
                    {properties.length > 0 ? (
                         properties.slice(0, 3).map(prop => (
-                            <PropertyListItem key={prop.id} property={prop} onViewDetails={() => onViewDetails(prop.id)} onDelete={() => onDelete(prop.id)} />
+                            <PropertyListItem key={prop.id} property={prop} onViewDetails={() => onViewDetails(prop.id)} onDelete={() => onDelete(prop.id)} onStatusChange={onStatusChange} />
                         ))
                    ) : (
                         <div className="bg-white p-8 rounded-lg text-center text-gray-500"><p>Ainda não publicou nenhum imóvel.</p></div>
@@ -206,14 +205,14 @@ const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDel
     </>
 );
 
-const MyPropertiesView = ({ properties, onViewDetails, onDelete }) => (
+const MyPropertiesView = ({ properties, onViewDetails, onDelete, onStatusChange }) => (
     <>
-        <DashboardHeader onAddNew={() => alert("Navegar para Adicionar Imóvel")} title="Meus Imóveis" subtitle="Gira todos os seus anúncios publicados." />
+        <DashboardHeader title="Meus Imóveis" subtitle="Gira todos os seus anúncios publicados." />
         <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
             <div className="space-y-4">
                 {properties.length > 0 ? (
                     properties.map(prop => (
-                        <PropertyListItem key={prop.id} property={prop} onViewDetails={() => onViewDetails(prop.id)} onDelete={() => onDelete(prop.id)} />
+                        <PropertyListItem key={prop.id} property={prop} onViewDetails={() => onViewDetails(prop.id)} onDelete={() => onDelete(prop.id)} onStatusChange={onStatusChange} />
                     ))
                 ) : (
                     <div className="text-center text-gray-500 py-10"><p>Nenhum imóvel encontrado.</p></div>
@@ -239,7 +238,6 @@ export default function CreativeDashboardPage() {
     const [properties, setProperties] = useState<Property[]>([]);
     const [activities, setActivities] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState('dashboard');
     const router = useRouter();
     
@@ -249,7 +247,6 @@ export default function CreativeDashboardPage() {
 
             if (error) {
                 console.error("Erro ao buscar propriedades:", error);
-                setError("Não foi possível carregar os imóveis.");
             } else {
                 setProperties(data || []);
             }
@@ -282,19 +279,34 @@ export default function CreativeDashboardPage() {
         router.push('/login');
     };
 
-    // MUDANÇA: Função para navegar para os detalhes do imóvel
     const handleViewDetails = (propertyId: string) => {
         router.push(`/properties/${propertyId}`);
     };
     
-    const handleDelete = (propertyId: string) => {
-        alert(`Apagar imóvel ${propertyId}`);
+    const handleDelete = async (propertyId: string) => {
+        if (confirm("Tem a certeza que quer apagar este imóvel?")) {
+            const { error } = await supabase.from('properties').delete().eq('id', propertyId);
+            if (error) {
+                alert("Erro ao apagar o imóvel.");
+            } else {
+                setProperties(prev => prev.filter(p => p.id !== propertyId));
+            }
+        }
+    };
+    
+    const handleStatusChange = async (propertyId: string, newStatus: 'Ativo' | 'Inativo' | 'Pendente' | 'Rejeitado') => {
+        const { error } = await supabase.from('properties').update({ status: newStatus }).eq('id', propertyId);
+        if (error) {
+            alert("Erro ao atualizar o status do imóvel.");
+        } else {
+            setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, status: newStatus } : p));
+        }
     };
 
     const renderContent = () => {
         switch(currentPage) {
             case 'imoveis':
-                return <MyPropertiesView properties={properties} onViewDetails={handleViewDetails} onDelete={handleDelete} />;
+                return <MyPropertiesView properties={properties} onViewDetails={handleViewDetails} onDelete={handleDelete} onStatusChange={handleStatusChange} />;
             case 'mensagens':
                 return <PlaceholderView title="Mensagens" />;
             case 'notificacoes':
@@ -303,12 +315,11 @@ export default function CreativeDashboardPage() {
                 router.push('/profile');
                 return null;
             default:
-                return <MainDashboardView stats={stats} properties={properties} activities={activities} onViewDetails={handleViewDetails} onDelete={handleDelete} />;
+                return <MainDashboardView stats={stats} properties={properties} activities={activities} onViewDetails={handleViewDetails} onDelete={handleDelete} onStatusChange={handleStatusChange} />;
         }
     };
 
     if (loading) return <LoadingScreen />;
-    if (error) return <ErrorScreen message={error} />;
 
     return (
         <div className="bg-gray-50 min-h-screen">
