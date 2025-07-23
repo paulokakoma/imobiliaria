@@ -12,23 +12,43 @@ export default function SupabaseConnectivityTest() {
     const testConnection = async () => {
       try {
         const supabase = createClient()
-        // Tenta buscar 1 usuário só para testar
-        const { data, error } = await supabase.from('users').select('*').limit(1)
-        if (error) {
+        const { error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .limit(1)
+          .single()
+
+        if (fetchError) {
           setStatus('fail')
-          setError(error.message)
+          setError(fetchError.message)
         } else {
           setStatus('ok')
         }
-      } catch (err: any) {
+      } catch (err) {
+        const unknownError = err as Error
         setStatus('fail')
-        setError(err.message)
+        setError(unknownError.message)
       }
     }
+
     testConnection()
   }, [])
 
-  if (status === 'pending') return <div className="p-4">Testando conexão com Supabase...</div>
-  if (status === 'ok') return <div className="p-4 text-green-600 font-bold">Conexão com Supabase OK!</div>
-  return <div className="p-4 text-red-600 font-bold">Erro ao conectar com Supabase: {error}</div>
+  if (status === 'pending') {
+    return <div className="p-4">Testando conexão com Supabase...</div>
+  }
+
+  if (status === 'ok') {
+    return (
+      <div className="p-4 text-green-600 font-bold">
+        Conexão com Supabase OK!
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 text-red-600 font-bold">
+      Erro ao conectar com Supabase: {error}
+    </div>
+  )
 }

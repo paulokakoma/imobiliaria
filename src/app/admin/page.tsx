@@ -1,14 +1,13 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import {
-    LayoutDashboard, Building2, MessageSquare, Bell, Settings, LogOut,
-    Plus, Search, ChevronDown, ChevronUp, Eye, Tag, DollarSign,
-    ArrowRight, Briefcase, UserCircle, LoaderCircle, X, MapPin, BedDouble, Bath, Trash2,
-    CheckCircle, XCircle, ShieldCheck, ShieldOff, Edit
+    LayoutDashboard, Building2, Users, LogOut,
+    CheckCircle, XCircle, Briefcase, LoaderCircle, X, Trash2, ShieldCheck, ShieldOff,
+    Eye, DollarSign, MessageSquare, ArrowRight, Search, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 // Tipos
@@ -20,10 +19,6 @@ interface Property {
     created_at: string;
     user_id: string;
     views?: number;
-    address: string;
-    bedrooms: number;
-    bathrooms: number;
-    image_urls?: string[];
     profiles: { full_name: string }; 
 }
 interface Profile {
@@ -62,14 +57,6 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user }: { activePage: strin
             <a href="#" onClick={() => onNavigate('users')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'users' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <Users size={20} className="mr-3" />
                 Gerir Utilizadores
-            </a>
-            <a href="#" onClick={() => onNavigate('messages')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'messages' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <MessageSquare size={20} className="mr-3" />
-                Mensagens
-            </a>
-            <a href="#" onClick={() => onNavigate('notifications')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'notifications' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <Bell size={20} className="mr-3" />
-                Notificações
             </a>
         </nav>
         <div className="p-4 border-t border-gray-200">
@@ -303,10 +290,16 @@ export default function AdminDashboardPage() {
     useEffect(() => {
         const fetchAllData = async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) { router.push('/login'); return; }
+            if (!user) {
+                router.push('/login');
+                return;
+            }
             
             const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-            if (profile?.role !== 'admin') { router.push('/dashboard'); return; }
+            if (profile?.role !== 'admin') {
+                router.push('/dashboard');
+                return;
+            }
             
             setUser(user);
 
