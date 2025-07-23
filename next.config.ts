@@ -1,7 +1,23 @@
-import type { NextConfig } from "next";
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // MUDANÇA: Adicionada a configuração para desativar todos os indicadores de desenvolvimento.
+  // Isto irá remover o ícone do Next.js que aparece no canto da tela.
+  devIndicators: false,
 
-const nextConfig: NextConfig = {
-  /* config options here */
+  async headers() {
+    return [
+      {
+        // Aplica-se a todos os recursos internos do Next.js em desenvolvimento
+        source: '/_next/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*', // Permite qualquer origem, seguro para desenvolvimento local
+          },
+        ],
+      },
+    ];
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
