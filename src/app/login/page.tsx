@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { User, Lock, Eye, EyeOff, LoaderCircle, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -31,16 +31,21 @@ export default function LoginPage() {
   const [lastName, setLastName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState('cliente');
 
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  useEffect(() => {
+    const roleFromStorage = sessionStorage.getItem('user_role');
+    if (roleFromStorage === 'vendedor_anunciante' || roleFromStorage === 'cliente') {
+      setUserRole(roleFromStorage);
+    }
+  }, []);
 
   const handleViewChange = (newView: 'login' | 'signup' | 'recover') => {
     setView(newView)
-    setEmail('')
-    setPassword('')
-    setFirstName('')
-    setLastName('')
     setError(null)
     setMessage(null)
   }
@@ -52,7 +57,7 @@ export default function LoginPage() {
     setMessage(null)
 
     if (view === 'signup') {
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -60,21 +65,31 @@ export default function LoginPage() {
             first_name: firstName,
             last_name: lastName,
             full_name: `${firstName} ${lastName}`,
-            role: 'vendedor_anunciante', // Todos os novos cadastros são de vendedores
+            role: userRole,
           },
         },
       })
 
       if (signUpError) {
         setError(signUpError.message)
-      } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+      } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
         setError("Já existe um utilizador com este e-mail. Se a conta for sua, tente fazer o login.");
-      } else if (data.user) {
-        // MUDANÇA: Redireciona o utilizador diretamente após o cadastro.
-        setMessage('Cadastro realizado com sucesso! A redirecionar para o seu dashboard...');
-        setTimeout(() => {
-            router.push('/dashboard');
-        }, 1500);
+      } else if (signUpData.user) {
+        // MUDANÇA: Inicia a sessão automaticamente após o cadastro
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if(signInError) {
+            setError('O seu cadastro foi criado, mas houve um erro ao iniciar a sessão. Por favor, tente fazer o login manualmente.');
+            setView('login');
+        } else {
+            setMessage('Cadastro realizado com sucesso! A redirecionar...');
+            const destination = userRole === 'vendedor_anunciante' ? '/dashboard' : '/screen';
+            router.push(destination);
+            router.refresh(); // Garante que o estado de autenticação é atualizado
+        }
       }
 
     } else if (view === 'login') {
@@ -95,29 +110,30 @@ export default function LoginPage() {
 
           if (profileError) throw profileError
 
-          const userRole = profile?.role
+          const dbUserRole = profile?.role
 
-          if (userRole === 'admin') {
+          if (dbUserRole === 'admin') {
             router.push('/admin')
-          } else {
+          } else if (dbUserRole === 'vendedor_anunciante') {
             router.push('/dashboard')
+          } else {
+            router.push('/screen')
           }
+          router.refresh();
 
         } catch (err: any) {
           setError('Erro ao buscar perfil do utilizador. Tente novamente.')
         }
       }
-    }
-
-    else if (view === 'recover') {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${location.origin}/auth/callback?next=/update-password`,
-      })
-      if (resetError) {
-        setError(resetError.message)
-      } else {
-        setMessage('Se existir uma conta com este e-mail, receberá as instruções de recuperação.')
-      }
+    } else if (view === 'recover') {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${location.origin}/auth/callback?next=/update-password`,
+        })
+        if (resetError) {
+          setError(resetError.message)
+        } else {
+          setMessage('Se existir uma conta com este e-mail, receberá as instruções de recuperação.')
+        }
     }
 
     setLoading(false)
@@ -145,7 +161,6 @@ export default function LoginPage() {
           <Lock className="text-purple-600" size={64} strokeWidth={1.5} />
         </div>
 
-        {/* Tabs de login/cadastro */}
         {view !== 'recover' ? (
           <div className="flex border-b">
             <button onClick={() => handleViewChange('login')} className={`w-1/2 py-3 text-center font-semibold transition-colors duration-300 ${view === 'login' ? 'text-purple-600 border-b-2 border-purple-600' : 'text-gray-500 hover:text-purple-600'}`}>
@@ -173,7 +188,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Email + senha */}
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><Mail size={20} /></span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg" />
@@ -187,7 +201,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Feedback de erro/mensagem */}
           {error && <p className="text-sm text-center text-red-600 p-3 bg-red-100 rounded-lg">{error}</p>}
           {message && <p className="text-sm text-center text-green-600 p-3 bg-green-100 rounded-lg">{message}</p>}
 

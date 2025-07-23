@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Building, Home, DollarSign, BedDouble, Bath, Ruler, FileText, Save, Upload, X, ArrowLeft, MapPin, LoaderCircle } from 'lucide-react'
+import { Building, Home, DollarSign, BedDouble, Bath, Ruler, FileText, Save, Upload, X, ArrowLeft, MapPin, LoaderCircle, Trash2, Plus } from 'lucide-react'
 
 // --- COMPONENTES ---
 
@@ -62,7 +62,6 @@ const huamboData = {
     "Bailundo": ["Centro de Bailundo", "Luvemba", "Bimbe", "Hengue"],
 };
 
-
 export default function EditPropertyPage() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -81,10 +80,9 @@ export default function EditPropertyPage() {
         length: "",
         description: "",
         amenities: [],
-        image_urls: [],
+        image_gallery: [],
     });
     
-    const [imageFiles, setImageFiles] = useState([]);
     const [imagesToDelete, setImagesToDelete] = useState([]);
 
     const router = useRouter();
@@ -114,26 +112,13 @@ export default function EditPropertyPage() {
                 return;
             }
 
-            // MUDANÇA: Lógica de parsing mais segura
-            const locationString = data.location || '';
-            const locationParts = locationString.split(', ');
-            const bairro = locationParts[0] || '';
-            const municipality = locationParts[1] || '';
-
+            const locationParts = data.location ? data.location.split(', ') : ['', ''];
             setFormData({
-                title: data.title || "",
-                listing_type: data.listing_type || 'para_arrendar',
+                ...data,
+                municipality: locationParts[1] || '',
+                bairro: locationParts[0] || '',
                 property_type: data.type || "",
-                price: data.price || "",
-                municipality: municipality,
-                bairro: bairro,
-                beds: data.beds || "",
-                baths: data.baths || "",
-                width: data.width || "",
-                length: data.length || "",
-                description: data.description || "",
-                amenities: data.amenities || [],
-                image_urls: data.image_urls || [],
+                image_gallery: data.image_gallery || []
             });
             setLoading(false);
         };
@@ -154,18 +139,33 @@ export default function EditPropertyPage() {
         }));
     };
 
-    const handleImageUpload = (e) => {
-        const files = Array.from(e.target.files);
-        setImageFiles(prev => [...prev, ...files]);
-        
-        const newImageUrls = files.map(file => URL.createObjectURL(file));
-        setFormData(prev => ({...prev, image_urls: [...prev.image_urls, ...newImageUrls]}));
+    const handleImageChange = (index, file) => {
+        const newGallery = [...formData.image_gallery];
+        newGallery[index] = {
+            ...newGallery[index],
+            file: file,
+            url: URL.createObjectURL(file)
+        };
+        setFormData(prev => ({ ...prev, image_gallery: newGallery }));
     };
 
-    const removeImage = (index, url) => {
-        setFormData(prev => ({...prev, image_urls: prev.image_urls.filter((_, i) => i !== index)}));
-        if (!url.startsWith('blob:')) {
-            setImagesToDelete(prev => [...prev, url]);
+    const handleImageNameChange = (index, name) => {
+        const newGallery = [...formData.image_gallery];
+        newGallery[index].name = name;
+        setFormData(prev => ({ ...prev, image_gallery: newGallery }));
+    };
+
+    const addImageSlot = () => {
+        setFormData(prev => ({
+            ...prev,
+            image_gallery: [...prev.image_gallery, { file: null, url: '', name: '' }]
+        }));
+    };
+
+    const removeImage = (index, image) => {
+        setFormData(prev => ({...prev, image_gallery: prev.image_gallery.filter((_, i) => i !== index)}));
+        if (image.url && !image.url.startsWith('blob:')) {
+            setImagesToDelete(prev => [...prev, image]);
         }
     };
 
@@ -183,22 +183,25 @@ export default function EditPropertyPage() {
         setSubmitting(true);
 
         if (imagesToDelete.length > 0) {
-            const filePaths = imagesToDelete.map(url => url.substring(url.indexOf(user.id)));
+            const filePaths = imagesToDelete.map(img => img.url.substring(img.url.indexOf(user.id)));
             await supabase.storage.from('property-images').remove(filePaths);
         }
 
-        const newImageUrls = [];
-        for (const file of imageFiles) {
-            const filePath = `${user.id}/${Date.now()}-${file.name}`;
-            const { error: uploadError } = await supabase.storage.from('property-images').upload(filePath, file);
-            if (uploadError) {
-                alert('Erro ao fazer upload da imagem: ' + uploadError.message);
-                setSubmitting(false);
-                return;
-            }
-            const { data: { publicUrl } } = supabase.storage.from('property-images').getPublicUrl(filePath);
-            newImageUrls.push(publicUrl);
-        }
+        const updatedImageGallery = await Promise.all(
+            formData.image_gallery.map(async (image) => {
+                if (image.file) {
+                    const filePath = `${user.id}/${image.name.replace(/\s+/g, '_') || 'imagem'}/${Date.now()}-${image.file.name}`;
+                    const { error: uploadError } = await supabase.storage.from('property-images').upload(filePath, image.file);
+                    if (uploadError) {
+                        alert('Erro ao fazer upload da imagem: ' + uploadError.message);
+                        throw uploadError;
+                    }
+                    const { data: { publicUrl } } = supabase.storage.from('property-images').getPublicUrl(filePath);
+                    return { name: image.name, url: publicUrl };
+                }
+                return image;
+            })
+        );
 
         const updatedProperty = {
             title: formData.title,
@@ -212,7 +215,8 @@ export default function EditPropertyPage() {
             length: Number(formData.length),
             description: formData.description,
             amenities: formData.amenities,
-            image_urls: [...formData.image_urls.filter(url => !url.startsWith('blob:')), ...newImageUrls],
+            image_gallery: updatedImageGallery,
+            image_urls: updatedImageGallery.map(img => img.url),
         };
 
         const { error: updateError } = await supabase.from('properties').update(updatedProperty).eq('id', id);
@@ -249,29 +253,29 @@ export default function EditPropertyPage() {
 
                     <form className="space-y-8" onSubmit={handleSubmit}>
                         <FormSection title="Informações Básicas">
-                            <InputField icon={<FileText size={20}/>} label="Título do Anúncio" id="title" type="text" name="title" placeholder="Ex: Vivenda T3 com Quintal" value={formData.title} onChange={handleChange} required/>
+                            <InputField icon={<FileText size={20}/>} label="Título do Anúncio" id="title" name="title" type="text" value={formData.title || ''} onChange={handleChange} required/>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <SelectField icon={<Home size={20}/>} label="Tipo de Imóvel" id="property_type" name="property_type" value={formData.property_type} onChange={handleChange} options={propertyTypes} required/>
-                                <InputField icon={<DollarSign size={20}/>} label={formData.listing_type === 'para_arrendar' ? "Preço (AOA/mês)" : "Preço (AOA)"} id="price" type="number" min="0" name="price" placeholder="150000" value={formData.price} onChange={handleChange} required/>
+                                <SelectField icon={<Home size={20}/>} label="Tipo de Imóvel" id="property_type" name="property_type" value={formData.property_type || ''} onChange={handleChange} options={propertyTypes} required/>
+                                <InputField icon={<DollarSign size={20}/>} label="Preço (AOA)" id="price" name="price" type="number" min="0" value={formData.price || ''} onChange={handleChange} required/>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <SelectField icon={<MapPin size={20}/>} label="Município" id="municipality" value={formData.municipality} onChange={handleMunicipalityChange} options={municipalities} required/>
-                                <SelectField icon={<MapPin size={20}/>} label="Bairro" id="bairro" name="bairro" value={formData.bairro} onChange={handleChange} options={availableBairros} disabled={!formData.municipality} required/>
+                                <SelectField icon={<MapPin size={20}/>} label="Município" id="municipality" value={formData.municipality || ''} onChange={handleMunicipalityChange} options={municipalities} required/>
+                                <SelectField icon={<MapPin size={20}/>} label="Bairro" id="bairro" name="bairro" value={formData.bairro || ''} onChange={handleChange} options={availableBairros} disabled={!formData.municipality} required/>
                             </div>
                         </FormSection>
 
                         <FormSection title="Detalhes do Imóvel">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <InputField icon={<BedDouble size={20}/>} label="Quartos" id="beds" type="number" min="0" name="beds" placeholder="3" value={formData.beds} onChange={handleChange} required/>
-                                <InputField icon={<Bath size={20}/>} label="Casas de Banho (WC)" id="baths" type="number" min="0" name="baths" placeholder="2" value={formData.baths} onChange={handleChange} required/>
+                                <InputField icon={<BedDouble size={20}/>} label="Quartos" id="beds" name="beds" type="number" min="0" value={formData.beds || ''} onChange={handleChange} required/>
+                                <InputField icon={<Bath size={20}/>} label="Casas de Banho (WC)" id="baths" name="baths" type="number" min="0" value={formData.baths || ''} onChange={handleChange} required/>
                                 <div className="flex items-center space-x-2">
-                                    <InputField icon={<Ruler size={20}/>} label="Largura (m)" id="width" type="number" min="0" name="width" placeholder="15" value={formData.width} onChange={handleChange}/>
-                                    <InputField icon={<Ruler size={20}/>} label="Comprimento (m)" id="length" type="number" min="0" name="length" placeholder="20" value={formData.length} onChange={handleChange}/>
+                                    <InputField icon={<Ruler size={20}/>} label="Largura (m)" id="width" name="width" type="number" min="0" value={formData.width || ''} onChange={handleChange}/>
+                                    <InputField icon={<Ruler size={20}/>} label="Comprimento (m)" id="length" name="length" type="number" min="0" value={formData.length || ''} onChange={handleChange}/>
                                 </div>
                             </div>
                             <div>
                                 <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                                <textarea id="description" name="description" rows="4" className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Descreva os detalhes do seu imóvel..." value={formData.description} onChange={handleChange} required></textarea>
+                                <textarea id="description" name="description" rows="4" className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" value={formData.description || ''} onChange={handleChange} required></textarea>
                             </div>
                         </FormSection>
 
@@ -285,26 +289,32 @@ export default function EditPropertyPage() {
                                 ))}
                             </div>
                         </FormSection>
-                        
+
                         <FormSection title="Galeria de Imagens">
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                                <Upload size={48} className="mx-auto text-gray-400"/>
-                                <p className="mt-2 text-gray-600">Arraste e solte as imagens aqui, ou</p>
-                                <label htmlFor="image-upload" className="cursor-pointer font-semibold text-purple-600 hover:underline">
-                                    clique para selecionar
-                                    <input id="image-upload" type="file" multiple accept="image/*" className="sr-only" onChange={handleImageUpload}/>
-                                </label>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                                {formData.image_urls.map((url, index) => (
-                                    <div key={index} className="relative">
-                                        <img src={url} alt={`Preview ${index}`} className="w-full h-32 object-cover rounded-lg"/>
-                                        <button type="button" onClick={() => removeImage(index, url)} className="absolute -top-2 -right-2 bg-red-600 text-white p-1 rounded-full">
-                                            <X size={16}/>
+                            <p className="text-sm text-gray-500">Adicione ou remova imagens para cada compartimento.</p>
+                            <div className="space-y-4">
+                                {formData.image_gallery.map((image, index) => (
+                                    <div key={index} className="flex items-center space-x-4">
+                                        <label htmlFor={`image-upload-${index}`} className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-purple-500">
+                                            {image.url ? (
+                                                <img src={image.url} alt="Preview" className="w-full h-full object-cover rounded-lg"/>
+                                            ) : (
+                                                <Upload size={32} className="text-gray-400"/>
+                                            )}
+                                            <input id={`image-upload-${index}`} type="file" accept="image/*" className="sr-only" onChange={(e) => handleImageChange(index, e.target.files[0])}/>
+                                        </label>
+                                        <div className="flex-grow">
+                                            <InputField icon={<Home size={20}/>} label="Nome do Compartimento" id={`compartment-name-${index}`} type="text" placeholder="Ex: Sala de Estar" value={image.name} onChange={(e) => handleImageNameChange(index, e.target.value)} />
+                                        </div>
+                                        <button type="button" onClick={() => removeImage(index, image)} className="p-2 text-red-500 hover:bg-red-100 rounded-full">
+                                            <Trash2 size={20}/>
                                         </button>
                                     </div>
                                 ))}
                             </div>
+                            <button type="button" onClick={addImageSlot} className="mt-4 flex items-center text-purple-600 font-semibold hover:underline">
+                                <Plus size={18} className="mr-2"/> Adicionar mais um compartimento
+                            </button>
                         </FormSection>
 
                         <div className="flex justify-end">

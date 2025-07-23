@@ -8,29 +8,37 @@ import {
     LayoutDashboard, Building2, MessageSquare, Bell, Settings, LogOut,
     Plus, Search, ChevronDown, ChevronUp, Eye, Tag, DollarSign,
     ArrowRight, Briefcase, UserCircle, LoaderCircle, X, MapPin, BedDouble, Bath, Trash2,
-    CheckCircle, XCircle, ShieldCheck, ShieldOff // Adicionados os ícones necessários
+    CheckCircle, XCircle, ShieldCheck, ShieldOff, Edit
 } from 'lucide-react';
 
 // Tipos
 interface Property {
     id: string;
     title: string;
-    description: string;
     price: number;
-    bedrooms: number;
-    bathrooms: number;
-    address: string;
-    image_urls?: string[];
     status: 'Ativo' | 'Inativo' | 'Pendente' | 'Rejeitado';
-    views?: number;
     created_at: string;
     user_id: string;
+    views?: number;
+    address: string;
+    bedrooms: number;
+    bathrooms: number;
+    image_urls?: string[];
+    profiles: { full_name: string }; 
+}
+interface Profile {
+    id: string;
+    full_name: string;
+    email: string;
+    role: 'admin' | 'vendedor_anunciante' | 'cliente';
+    active: boolean;
 }
 
 // Inicializar Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // --- COMPONENTES DE UI ---
 
@@ -47,9 +55,21 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user }: { activePage: strin
                 <LayoutDashboard size={20} className="mr-3" />
                 Dashboard
             </a>
-            <a href="#" onClick={() => onNavigate('imoveis')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'imoveis' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
+            <a href="#" onClick={() => onNavigate('properties')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'properties' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <Briefcase size={20} className="mr-3" />
                 Gerir Imóveis
+            </a>
+            <a href="#" onClick={() => onNavigate('users')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'users' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <Users size={20} className="mr-3" />
+                Gerir Utilizadores
+            </a>
+            <a href="#" onClick={() => onNavigate('messages')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'messages' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <MessageSquare size={20} className="mr-3" />
+                Mensagens
+            </a>
+            <a href="#" onClick={() => onNavigate('notifications')} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${activePage === 'notifications' ? 'bg-purple-100 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <Bell size={20} className="mr-3" />
+                Notificações
             </a>
         </nav>
         <div className="p-4 border-t border-gray-200">
@@ -61,30 +81,17 @@ const Sidebar = ({ activePage, onNavigate, onLogout, user }: { activePage: strin
     </aside>
 );
 
-const DashboardHeader = ({ onAddNew, title, subtitle }: { onAddNew?: () => void, title: string, subtitle: string }) => (
+const DashboardHeader = ({ title, subtitle }: { title: string, subtitle: string }) => (
     <header className="flex items-center justify-between mb-8">
         <div>
             <h1 className="text-3xl font-bold text-gray-800">{title}</h1>
             <p className="text-gray-500 mt-1">{subtitle}</p>
         </div>
-        {onAddNew && (
-            <button onClick={onAddNew} className="flex items-center px-5 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors shadow-md">
-                <Plus size={20} className="mr-2" />
-                Publicar Novo Imóvel
-            </button>
-        )}
     </header>
 );
 
-const StatCard = ({ icon, title, value, detail, color, onClick }: { 
-    icon: React.ReactNode, 
-    title: string, 
-    value: string | number, 
-    detail: string, 
-    color: string, 
-    onClick?: () => void 
-}) => (
-    <div className={`p-6 rounded-xl shadow-md flex flex-col justify-between h-full bg-gradient-to-br ${color} transition-transform hover:scale-105 cursor-pointer`} onClick={onClick}>
+const StatCard = ({ icon, title, value, detail, color }: { icon: React.ReactNode, title: string, value: string | number, detail: string, color: string }) => (
+    <div className={`p-6 rounded-xl shadow-md flex flex-col justify-between h-full bg-gradient-to-br ${color}`}>
         <div>
             <div className="flex items-center text-white mb-4">
                 {icon}
@@ -92,28 +99,32 @@ const StatCard = ({ icon, title, value, detail, color, onClick }: {
             </div>
             <p className="text-4xl font-bold text-white">{value}</p>
         </div>
-        <div className="flex items-center justify-between text-white text-sm mt-4 opacity-80">
-            <span>{detail}</span>
-            <ArrowRight size={16} />
+        <p className="text-white text-sm mt-4 opacity-80">{detail}</p>
+    </div>
+);
+
+const LoadingScreen = () => (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="text-center">
+            <LoaderCircle className="animate-spin text-purple-600 mx-auto" size={48} />
+            <p className="mt-4 text-gray-600">A carregar o painel de administração...</p>
         </div>
     </div>
 );
 
-const ActivityItem = ({ icon, text, time }: { icon: React.ReactNode, text: string, time: string }) => (
-    <div className="flex items-start space-x-4 py-4">
-        <div className="bg-gray-100 p-3 rounded-full">
-            {icon}
-        </div>
-        <div className="flex-grow">
-            <p className="text-gray-700">{text}</p>
-            <p className="text-xs text-gray-400 mt-1">{time}</p>
+const ErrorScreen = ({ message }: { message: string }) => (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+        <div className="text-center bg-white p-10 rounded-lg shadow-md">
+            <X size={48} className="mx-auto text-red-400" />
+            <h3 className="mt-4 text-xl font-semibold text-red-800">Ocorreu um Erro</h3>
+            <p className="mt-1 text-gray-500">{message}</p>
         </div>
     </div>
 );
 
 const ToggleSwitch = ({ checked, onChange }) => (
     <button
-        onClick={(e) => { e.stopPropagation(); onChange(); }}
+        onClick={onChange}
         className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 ${checked ? 'bg-purple-600' : 'bg-gray-300'}`}
     >
         <span
@@ -122,105 +133,152 @@ const ToggleSwitch = ({ checked, onChange }) => (
     </button>
 );
 
-
-const PropertyListItem = ({ property, onViewDetails, onDelete, onStatusChange }: { 
-    property: Property, 
-    onViewDetails: () => void, 
-    onDelete: () => void,
-    onStatusChange: (id: string, status: 'Ativo' | 'Inativo' | 'Pendente' | 'Rejeitado') => void
-}) => (
-    <div onClick={onViewDetails} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 cursor-pointer hover:border-purple-300">
-        <img src={property.image_urls?.[0] || 'https://placehold.co/200x150/f3f4f6/31343C?text=Imóvel'} alt={property.title} className="w-full sm:w-32 h-24 object-cover rounded-md" />
-        <div className="flex-grow">
-            <div className="flex justify-between items-start">
-                <h4 className="font-bold text-lg text-gray-800">{property.title}</h4>
-                <span className={`px-3 py-1 text-xs font-semibold rounded-full ${property.status === 'Ativo' ? 'bg-green-100 text-green-800' : property.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                    {property.status}
-                </span>
-            </div>
-            <div className="flex items-center text-gray-500 text-sm mt-1 space-x-4">
-                <span className="flex items-center"><MapPin size={14} className="mr-1.5"/> {property.address}</span>
-                <span className="flex items-center"><BedDouble size={14} className="mr-1.5"/> {property.bedrooms}</span>
-                <span className="flex items-center"><Bath size={14} className="mr-1.5"/> {property.bathrooms}</span>
-            </div>
-            <p className="text-purple-600 font-semibold text-lg mt-2">{new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(property.price)}</p>
-        </div>
-        <div className="flex space-x-2 self-end sm:self-center">
-            {property.status === 'Pendente' ? (
-                <>
-                    <button onClick={(e) => { e.stopPropagation(); onStatusChange(property.id, 'Ativo'); }} className="p-2 text-green-600 hover:bg-green-50 rounded-full" title="Aprovar"><CheckCircle size={18}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); onStatusChange(property.id, 'Rejeitado'); }} className="p-2 text-red-600 hover:bg-red-50 rounded-full" title="Rejeitar"><XCircle size={18}/></button>
-                </>
-            ) : (
-                <ToggleSwitch
-                    checked={property.status === 'Ativo'}
-                    onChange={() => onStatusChange(property.id, property.status === 'Ativo' ? 'Inativo' : 'Ativo')}
-                />
-            )}
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full"><Trash2 size={18}/></button>
-        </div>
-    </div>
-);
-
-const LoadingScreen = () => (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-center">
-            <LoaderCircle className="animate-spin text-purple-600 mx-auto" size={48} />
-            <p className="mt-4 text-gray-600">A carregar o seu dashboard...</p>
-        </div>
-    </div>
-);
-
 // --- VISTAS DO DASHBOARD ---
 
-const MainDashboardView = ({ stats, properties, activities, onViewDetails, onDelete, onStatusChange }) => (
+const MainDashboardView = ({ stats }) => (
     <>
-        <DashboardHeader title="Bem-vindo de volta!" subtitle="Aqui está um resumo da sua atividade." />
+        <DashboardHeader title="Visão Geral" subtitle="Resumo da atividade da plataforma." />
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-            <StatCard icon={<Building2 size={24} />} title="Imóveis Ativos" value={stats.activeListings} detail={`${stats.pendingListings} pendente(s)`} color="from-purple-500 to-indigo-600" />
-            <StatCard icon={<Eye size={24} />} title="Total de Visitas" value={stats.totalViews} detail="Este mês" color="from-blue-400 to-cyan-500" />
-            <StatCard icon={<MessageSquare size={24} />} title="Novas Mensagens" value="8" detail="3 não lidas" color="from-green-400 to-emerald-500" />
-            <StatCard icon={<DollarSign size={24} />} title="Propostas" value="4" detail="1 nova hoje" color="from-orange-400 to-red-500" />
-        </section>
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Imóveis Recentes</h2>
-                <div className="space-y-4">
-                   {properties.length > 0 ? (
-                        properties.slice(0, 3).map(prop => (
-                            <PropertyListItem key={prop.id} property={prop} onViewDetails={() => onViewDetails(prop.id)} onDelete={() => onDelete(prop.id)} onStatusChange={onStatusChange} />
-                        ))
-                   ) : (
-                        <div className="bg-white p-8 rounded-lg text-center text-gray-500"><p>Ainda não publicou nenhum imóvel.</p></div>
-                   )}
-                </div>
-            </div>
-            <div>
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Atividade Recente</h2>
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                    <div className="divide-y divide-gray-100">{activities.map(act => (<ActivityItem key={act.id} icon={act.icon} text={act.text} time={act.time} />))}</div>
-                </div>
-            </div>
+            <StatCard icon={<Building2 size={24} />} title="Total de Imóveis" value={stats.totalProperties} detail={`${stats.pendingProperties} pendente(s)`} color="from-purple-500 to-indigo-600" />
+            <StatCard icon={<Users size={24} />} title="Total de Utilizadores" value={stats.totalUsers} detail={`${stats.sellerCount} Vendedores`} color="from-blue-400 to-cyan-500" />
+            <StatCard icon={<Eye size={24} />} title="Total de Visitas" value={stats.totalViews} detail="Este mês" color="from-green-400 to-emerald-500" />
+            <StatCard icon={<DollarSign size={24} />} title="Novos Anúncios" value={stats.newToday} detail="Hoje" color="from-orange-400 to-red-500" />
         </section>
     </>
 );
 
-const MyPropertiesView = ({ properties, onViewDetails, onDelete, onStatusChange }) => (
-    <>
-        <DashboardHeader title="Meus Imóveis" subtitle="Gira todos os seus anúncios publicados." />
-        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-            <div className="space-y-4">
-                {properties.length > 0 ? (
-                    properties.map(prop => (
-                        <PropertyListItem key={prop.id} property={prop} onViewDetails={() => onViewDetails(prop.id)} onDelete={() => onDelete(prop.id)} onStatusChange={onStatusChange} />
-                    ))
-                ) : (
-                    <div className="text-center text-gray-500 py-10"><p>Nenhum imóvel encontrado.</p></div>
-                )}
+const PropertiesView = ({ properties, onStatusChange, onDelete, onViewDetails }) => {
+    const [filter, setFilter] = useState('Todos');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 7;
+
+    const filteredProperties = useMemo(() => {
+        return properties
+            .filter(p => filter === 'Todos' || p.status === filter)
+            .filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [properties, filter, searchTerm]);
+
+    const paginatedProperties = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredProperties.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredProperties, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredProperties.length / itemsPerPage);
+
+    return (
+        <>
+            <DashboardHeader title="Gerir Imóveis" subtitle="Aprove, rejeite e gira todos os anúncios da plataforma." />
+            <div className="flex justify-between mb-4">
+                <div className="flex space-x-2">
+                    {['Todos', 'Pendente', 'Ativo', 'Inativo', 'Rejeitado'].map(status => (
+                        <button key={status} onClick={() => { setFilter(status); setCurrentPage(1); }} className={`px-4 py-2 text-sm font-semibold rounded-full ${filter === status ? 'bg-purple-600 text-white' : 'bg-white hover:bg-gray-100'}`}>{status}</button>
+                    ))}
+                </div>
+                <div className="relative">
+                    <input type="text" placeholder="Pesquisar por título..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2 border rounded-lg"/>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
+                </div>
             </div>
-        </div>
-    </>
-);
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="p-4 font-semibold">Título</th>
+                            <th className="p-4 font-semibold">Proprietário</th>
+                            <th className="p-4 font-semibold">Status</th>
+                            <th className="p-4 font-semibold text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {paginatedProperties.map(prop => (
+                            <tr key={prop.id} onClick={() => onViewDetails(prop.id)} className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer">
+                                <td className="p-4">{prop.title}</td>
+                                <td className="p-4 text-gray-600">{prop.profiles?.full_name || 'N/A'}</td>
+                                <td className="p-4"><span className={`px-3 py-1 text-xs font-semibold rounded-full ${prop.status === 'Ativo' ? 'bg-green-100 text-green-800' : prop.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{prop.status}</span></td>
+                                <td className="p-4 flex justify-end space-x-2">
+                                    {prop.status === 'Pendente' && (
+                                        <>
+                                            <button onClick={(e) => { e.stopPropagation(); onStatusChange(prop.id, 'Ativo'); }} className="p-2 text-green-600 hover:bg-green-50 rounded-full" title="Aprovar"><CheckCircle size={18}/></button>
+                                            <button onClick={(e) => { e.stopPropagation(); onStatusChange(prop.id, 'Rejeitado'); }} className="p-2 text-red-600 hover:bg-red-50 rounded-full" title="Rejeitar"><XCircle size={18}/></button>
+                                        </>
+                                    )}
+                                    <button onClick={(e) => { e.stopPropagation(); onDelete(prop.id); }} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full" title="Apagar"><Trash2 size={18}/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center mt-4 space-x-2">
+                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-full disabled:opacity-50"><ChevronLeft/></button>
+                    <span>Página {currentPage} de {totalPages}</span>
+                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-full disabled:opacity-50"><ChevronRight/></button>
+                </div>
+            )}
+        </>
+    );
+};
+
+const UsersView = ({ users, onStatusChange, onDelete }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState('Todos');
+
+    const filteredUsers = useMemo(() => {
+        return users
+            .filter(u => roleFilter === 'Todos' || u.role === roleFilter)
+            .filter(u => u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [users, roleFilter, searchTerm]);
+
+    return (
+        <>
+            <DashboardHeader title="Gerir Utilizadores" subtitle="Ative, desative e gira todos os utilizadores da plataforma." />
+            <div className="flex justify-between mb-4">
+                <div className="flex space-x-2">
+                    {['Todos', 'vendedor_anunciante', 'cliente'].map(role => (
+                        <button key={role} onClick={() => setRoleFilter(role)} className={`px-4 py-2 text-sm font-semibold rounded-full ${roleFilter === role ? 'bg-purple-600 text-white' : 'bg-white hover:bg-gray-100'}`}>{role}</button>
+                    ))}
+                </div>
+                <div className="relative">
+                    <input type="text" placeholder="Pesquisar por nome ou email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2 border rounded-lg"/>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
+                </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="p-4 font-semibold">Nome</th>
+                            <th className="p-4 font-semibold">Email</th>
+                            <th className="p-4 font-semibold">Função</th>
+                            <th className="p-4 font-semibold">Status</th>
+                            <th className="p-4 font-semibold text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredUsers.map(user => (
+                            <tr key={user.id} className="border-b border-gray-200">
+                                <td className="p-4">{user.full_name}</td>
+                                <td className="p-4 text-gray-600">{user.email}</td>
+                                <td className="p-4 text-gray-600">{user.role}</td>
+                                <td className="p-4">
+                                    <ToggleSwitch
+                                        checked={user.active}
+                                        onChange={() => onStatusChange(user.id, !user.active)}
+                                    />
+                                </td>
+                                <td className="p-4 flex justify-end space-x-2">
+                                    <button onClick={() => onDelete(user.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full"><Trash2 size={18}/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
+};
 
 const PlaceholderView = ({ title }: { title: string }) => (
      <>
@@ -233,100 +291,116 @@ const PlaceholderView = ({ title }: { title: string }) => (
 
 
 // --- COMPONENTE PRINCIPAL ---
-export default function CreativeDashboardPage() {
+export default function AdminDashboardPage() {
     const [user, setUser] = useState<User | null>(null);
     const [properties, setProperties] = useState<Property[]>([]);
-    const [activities, setActivities] = useState<any[]>([]);
+    const [users, setUsers] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState('dashboard');
     const router = useRouter();
-    
+
     useEffect(() => {
         const fetchAllData = async () => {
-            const { data, error } = await supabase.from('properties').select('*').order('created_at', { ascending: false });
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { router.push('/login'); return; }
+            
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+            if (profile?.role !== 'admin') { router.push('/dashboard'); return; }
+            
+            setUser(user);
 
-            if (error) {
-                console.error("Erro ao buscar propriedades:", error);
+            // MUDANÇA: Lógica de busca de dados separada para evitar erros de RLS em joins
+            const { data: propertiesData, error: propertiesError } = await supabase.from('properties').select('*');
+            const { data: profilesData, error: profilesError } = await supabase.from('profiles').select('*');
+
+            if (propertiesError || profilesError) {
+                setError("Não foi possível carregar os dados da plataforma.");
             } else {
-                setProperties(data || []);
+                const profilesMap = new Map(profilesData.map(p => [p.id, p]));
+                const propertiesWithProfiles = (propertiesData || []).map(prop => ({
+                    ...prop,
+                    profiles: profilesMap.get(prop.user_id) || { full_name: 'Utilizador Removido' }
+                }));
+                setProperties(propertiesWithProfiles);
+                setUsers((profilesData || []).filter(p => p.role !== 'admin'));
             }
             
-            setActivities([
-                { id: 1, icon: <MessageSquare size={20} className="text-green-600"/>, text: "Nova mensagem sobre 'Vivenda V3 no Centro'", time: "há 5 minutos" },
-                { id: 2, icon: <Eye size={20} className="text-blue-600"/>, text: "O seu anúncio 'Apartamento T2' recebeu 25 novas visitas.", time: "há 2 horas" },
-                { id: 3, icon: <Tag size={20} className="text-orange-600"/>, text: "Recebeu uma nova proposta para 'Loja na Baixa'.", time: "há 1 dia" },
-            ]);
-            setUser({ id: 'admin-id-placeholder' } as User);
-
             setLoading(false);
         };
-
         fetchAllData();
-    }, []);
+    }, [router]);
     
-    const stats = useMemo(() => {
-        const active = properties.filter(p => p.status === 'Ativo').length;
-        const totalViews = properties.reduce((acc, p) => acc + (p.views || 0), 0);
-        return {
-            activeListings: active,
-            pendingListings: properties.length - active,
-            totalViews: totalViews.toLocaleString('pt-AO'),
-        };
-    }, [properties]);
+    const stats = useMemo(() => ({
+        totalProperties: properties.length,
+        pendingProperties: properties.filter(p => p.status === 'Pendente').length,
+        totalUsers: users.length,
+        sellerCount: users.filter(u => u.role === 'vendedor_anunciante').length,
+        totalViews: properties.reduce((acc, p) => acc + (p.views || 0), 0).toLocaleString('pt-AO'),
+        newToday: properties.filter(p => new Date(p.created_at).toDateString() === new Date().toDateString()).length,
+    }), [properties, users]);
     
-    const handleLogout = () => {
-        alert("Logout simulado.");
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
         router.push('/login');
     };
 
+    const handlePropertyStatusChange = async (id, status) => {
+        const { error } = await supabase.from('properties').update({ status }).eq('id', id);
+        if (error) { alert("Erro ao atualizar status do imóvel."); } 
+        else { setProperties(prev => prev.map(p => p.id === id ? { ...p, status } : p)); }
+    };
+
+    const handlePropertyDelete = async (id) => {
+        if (confirm("Tem a certeza que quer apagar este imóvel?")) {
+            const { error } = await supabase.from('properties').delete().eq('id', id);
+            if (error) { alert("Erro ao apagar imóvel."); }
+            else { setProperties(prev => prev.filter(p => p.id !== id)); }
+        }
+    };
+
+    const handleUserStatusChange = async (id, active) => {
+        const { error } = await supabase.from('profiles').update({ active }).eq('id', id);
+        if (error) { alert("Erro ao atualizar status do utilizador."); }
+        else { setUsers(prev => prev.map(u => u.id === id ? { ...u, active } : u)); }
+    };
+
+    const handleUserDelete = async (id) => {
+        if (confirm("Tem a certeza que quer apagar este utilizador? Esta ação é irreversível.")) {
+            const { error } = await supabase.from('profiles').delete().eq('id', id);
+            if (error) { alert("Erro ao apagar utilizador."); }
+            else { setUsers(prev => prev.filter(u => u.id !== id)); }
+        }
+    };
+    
     const handleViewDetails = (propertyId: string) => {
         router.push(`/properties/${propertyId}`);
     };
     
-    const handleDelete = async (propertyId: string) => {
-        if (confirm("Tem a certeza que quer apagar este imóvel?")) {
-            const { error } = await supabase.from('properties').delete().eq('id', propertyId);
-            if (error) {
-                alert("Erro ao apagar o imóvel.");
-            } else {
-                setProperties(prev => prev.filter(p => p.id !== propertyId));
-            }
-        }
-    };
-    
-    const handleStatusChange = async (propertyId: string, newStatus: 'Ativo' | 'Inativo' | 'Pendente' | 'Rejeitado') => {
-        const { error } = await supabase.from('properties').update({ status: newStatus }).eq('id', propertyId);
-        if (error) {
-            alert("Erro ao atualizar o status do imóvel.");
-        } else {
-            setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, status: newStatus } : p));
-        }
-    };
-
     const renderContent = () => {
         switch(currentPage) {
-            case 'imoveis':
-                return <MyPropertiesView properties={properties} onViewDetails={handleViewDetails} onDelete={handleDelete} onStatusChange={handleStatusChange} />;
-            case 'mensagens':
-                return <PlaceholderView title="Mensagens" />;
-            case 'notificacoes':
-                return <PlaceholderView title="Notificações" />;
-            case 'perfil':
-                router.push('/profile');
-                return null;
+            case 'dashboard':
+                return <MainDashboardView stats={stats} />;
+            case 'properties':
+                return <PropertiesView properties={properties} onStatusChange={handlePropertyStatusChange} onDelete={handlePropertyDelete} onViewDetails={handleViewDetails} />;
+            case 'users':
+                return <UsersView users={users} onStatusChange={handleUserStatusChange} onDelete={handleUserDelete} />;
             default:
-                return <MainDashboardView stats={stats} properties={properties} activities={activities} onViewDetails={handleViewDetails} onDelete={handleDelete} onStatusChange={handleStatusChange} />;
+                return <PlaceholderView title={currentPage.charAt(0).toUpperCase() + currentPage.slice(1)} />;
         }
     };
 
     if (loading) return <LoadingScreen />;
+    if (error) return <ErrorScreen message={error} />;
 
     return (
         <div className="bg-gray-50 min-h-screen">
-            <Sidebar activePage={currentPage} onNavigate={setCurrentPage} onLogout={handleLogout} user={user} />
-            <main className="ml-64 p-8">
-                {renderContent()}
-            </main>
+            <div className="flex">
+                <Sidebar activePage={currentPage} onNavigate={setCurrentPage} onLogout={handleLogout} user={user} />
+                <main className="ml-64 p-8 flex-1">
+                    {renderContent()}
+                </main>
+            </div>
         </div>
     );
 }

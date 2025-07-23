@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Building, Home, DollarSign, BedDouble, Bath, Ruler, FileText, Plus, Upload, X, ArrowLeft, MapPin, LoaderCircle } from 'lucide-react'
+import { Building, Home, DollarSign, BedDouble, Bath, Ruler, FileText, Plus, Upload, X, ArrowLeft, MapPin, LoaderCircle, Trash2 } from 'lucide-react'
 
 // --- COMPONENTES ---
 
@@ -67,13 +67,13 @@ export default function AddPropertyPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     
-    const [imageFiles, setImageFiles] = useState([]);
-    const [imagePreviews, setImagePreviews] = useState([]);
+    const [imageGallery, setImageGallery] = useState([{ file: null, previewUrl: '', name: '' }]);
     
     const [title, setTitle] = useState("");
     const [listingType, setListingType] = useState('para_arrendar');
     const [propertyType, setPropertyType] = useState("");
     const [price, setPrice] = useState("");
+    const [displayPrice, setDisplayPrice] = useState("");
     const [municipality, setMunicipality] = useState("");
     const [bairro, setBairro] = useState("");
     const [availableBairros, setAvailableBairros] = useState([]);
@@ -110,17 +110,25 @@ export default function AddPropertyPage() {
         setAvailableBairros(huamboData[selectedMunicipality] || []);
     };
 
-    const handleImageUpload = (e) => {
-        const files = Array.from(e.target.files);
-        setImageFiles(prev => [...prev, ...files]);
-
-        const newImageUrls = files.map(file => URL.createObjectURL(file));
-        setImagePreviews(prev => [...prev, ...newImageUrls]);
+    const handleImageChange = (index, file) => {
+        const newGallery = [...imageGallery];
+        newGallery[index].file = file;
+        newGallery[index].previewUrl = URL.createObjectURL(file);
+        setImageGallery(newGallery);
+    };
+    
+    const handleImageNameChange = (index, name) => {
+        const newGallery = [...imageGallery];
+        newGallery[index].name = name;
+        setImageGallery(newGallery);
     };
 
-    const removeImage = (index) => {
-        setImagePreviews(imagePreviews.filter((_, i) => i !== index));
-        setImageFiles(imageFiles.filter((_, i) => i !== index));
+    const addImageSlot = () => {
+        setImageGallery([...imageGallery, { file: null, previewUrl: '', name: '' }]);
+    };
+
+    const removeImageSlot = (index) => {
+        setImageGallery(imageGallery.filter((_, i) => i !== index));
     };
 
     const handleAmenityChange = (amenity) => {
@@ -129,6 +137,31 @@ export default function AddPropertyPage() {
                 ? prev.filter((a) => a !== amenity)
                 : [...prev, amenity]
         );
+    };
+
+    const handlePriceChange = (e) => {
+        const rawValue = e.target.value;
+        const numericValue = rawValue.replace(/\D/g, ''); 
+        
+        if (numericValue === '') {
+            setPrice('');
+            setDisplayPrice('');
+            return;
+        }
+
+        setPrice(numericValue);
+        const formattedValue = new Intl.NumberFormat('de-DE').format(Number(numericValue));
+        setDisplayPrice(formattedValue);
+    };
+
+    const sanitizeForPath = (text) => {
+        return text
+            .toString()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, '_')
+            .replace(/[^\w-]+/g, '');
     };
 
     const handleSubmit = async (e) => {
@@ -141,22 +174,26 @@ export default function AddPropertyPage() {
 
         setSubmitting(true);
 
-        const uploadedImageUrls = [];
-        for (const file of imageFiles) {
-            const filePath = `${user.id}/${Date.now()}-${file.name}`;
-            // MUDANÇA: Corrigido o nome do bucket para 'property-images'
-            const { error: uploadError } = await supabase.storage
-                .from('property-images')
-                .upload(filePath, file);
+        const uploadedImages = [];
+        for (const image of imageGallery) {
+            if (image.file) {
+                const compartmentName = sanitizeForPath(image.name || 'imagem');
+                const fileName = sanitizeForPath(image.file.name);
+                const filePath = `${user.id}/${compartmentName}/${Date.now()}-${fileName}`;
+                
+                const { error: uploadError } = await supabase.storage
+                    .from('property-images')
+                    .upload(filePath, image.file);
 
-            if (uploadError) {
-                alert('Erro ao fazer upload da imagem: ' + uploadError.message);
-                setSubmitting(false);
-                return;
+                if (uploadError) {
+                    alert('Erro ao fazer upload da imagem: ' + uploadError.message);
+                    setSubmitting(false);
+                    return;
+                }
+                
+                const { data: { publicUrl } } = supabase.storage.from('property-images').getPublicUrl(filePath);
+                uploadedImages.push({ name: image.name, url: publicUrl });
             }
-            
-            const { data: { publicUrl } } = supabase.storage.from('property-images').getPublicUrl(filePath);
-            uploadedImageUrls.push(publicUrl);
         }
 
         const newProperty = {
@@ -172,7 +209,8 @@ export default function AddPropertyPage() {
             length: Number(length),
             description,
             amenities,
-            image_urls: uploadedImageUrls,
+            image_urls: uploadedImages.map(img => img.url),
+            image_gallery: uploadedImages,
             status: 'Pendente',
         };
 
@@ -219,7 +257,7 @@ export default function AddPropertyPage() {
                             <InputField icon={<FileText size={20}/>} label="Título do Anúncio" id="title" type="text" placeholder="Ex: Vivenda T3 com Quintal" value={title} onChange={e => setTitle(e.target.value)} required/>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <SelectField icon={<Home size={20}/>} label="Tipo de Imóvel" id="type" value={propertyType} onChange={e => setPropertyType(e.target.value)} options={propertyTypes} required/>
-                                <InputField icon={<DollarSign size={20}/>} label={listingType === 'para_arrendar' ? "Preço (AOA/mês)" : "Preço (AOA)"} id="price" type="number" min="0" placeholder="150000" value={price} onChange={e => setPrice(e.target.value)} required/>
+                                <InputField icon={<DollarSign size={20}/>} label={listingType === 'para_arrendar' ? "Preço (AOA/mês)" : "Preço (AOA)"} id="price" type="text" placeholder="1.500.000" value={displayPrice} onChange={handlePriceChange} required/>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <SelectField icon={<MapPin size={20}/>} label="Município" id="municipality" value={municipality} onChange={handleMunicipalityChange} options={municipalities} required/>
@@ -252,24 +290,30 @@ export default function AddPropertyPage() {
                         </FormSection>
                         
                         <FormSection title="Galeria de Imagens">
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                                <Upload size={48} className="mx-auto text-gray-400"/>
-                                <p className="mt-2 text-gray-600">Arraste e solte as imagens aqui, ou</p>
-                                <label htmlFor="image-upload" className="cursor-pointer font-semibold text-purple-600 hover:underline">
-                                    clique para selecionar
-                                    <input id="image-upload" type="file" multiple accept="image/*" className="sr-only" onChange={handleImageUpload}/>
-                                </label>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                                {imagePreviews.map((url, index) => (
-                                    <div key={index} className="relative">
-                                        <img src={url} alt={`Preview ${index}`} className="w-full h-32 object-cover rounded-lg"/>
-                                        <button type="button" onClick={() => removeImage(index)} className="absolute -top-2 -right-2 bg-red-600 text-white p-1 rounded-full">
-                                            <X size={16}/>
+                            <p className="text-sm text-gray-500">Adicione imagens para cada compartimento relevante do seu imóvel.</p>
+                            <div className="space-y-4">
+                                {imageGallery.map((image, index) => (
+                                    <div key={index} className="flex items-center space-x-4">
+                                        <label htmlFor={`image-upload-${index}`} className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-purple-500">
+                                            {image.previewUrl ? (
+                                                <img src={image.previewUrl} alt="Preview" className="w-full h-full object-cover rounded-lg"/>
+                                            ) : (
+                                                <Upload size={32} className="text-gray-400"/>
+                                            )}
+                                            <input id={`image-upload-${index}`} type="file" accept="image/*" className="sr-only" onChange={(e) => handleImageChange(index, e.target.files[0])}/>
+                                        </label>
+                                        <div className="flex-grow">
+                                            <InputField icon={<Home size={20}/>} label="Nome do Compartimento" id={`compartment-name-${index}`} type="text" placeholder="Ex: Sala de Estar" value={image.name} onChange={(e) => handleImageNameChange(index, e.target.value)} />
+                                        </div>
+                                        <button type="button" onClick={() => removeImageSlot(index)} className="p-2 text-red-500 hover:bg-red-100 rounded-full">
+                                            <Trash2 size={20}/>
                                         </button>
                                     </div>
                                 ))}
                             </div>
+                            <button type="button" onClick={addImageSlot} className="mt-4 flex items-center text-purple-600 font-semibold hover:underline">
+                                <Plus size={18} className="mr-2"/> Adicionar mais um compartimento
+                            </button>
                         </FormSection>
 
                         <div className="flex justify-end">
